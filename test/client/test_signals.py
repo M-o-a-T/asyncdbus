@@ -20,10 +20,10 @@ class ExampleInterface(ServiceInterface):
         return ['hello', 'world']
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_signals():
-    bus1 = await MessageBus().connect()
-    bus2 = await MessageBus().connect()
+  async with MessageBus().connect() as bus1, \
+          MessageBus().connect() as bus2:
 
     bus_intr = await bus1.introspect('org.freedesktop.DBus', '/org/freedesktop/DBus')
     bus_obj = bus1.get_proxy_object('org.freedesktop.DBus', '/org/freedesktop/DBus', bus_intr)
@@ -106,52 +106,48 @@ async def test_signals():
     # special case: another bus with the same path and interface but on a
     # different name and connection will trigger the match rule of the first
     # (happens with mpris)
-    bus3 = await MessageBus().connect()
-    await bus3.request_name('test.signals.name2')
-    service_interface2 = ExampleInterface()
-    bus3.export('/test/path', service_interface2)
+    async with MessageBus().connect() as bus3:
+        await bus3.request_name('test.signals.name2')
+        service_interface2 = ExampleInterface()
+        bus3.export('/test/path', service_interface2)
 
-    obj = bus2.get_proxy_object('test.signals.name2', '/test/path',
-                                bus3._introspect_export_path('/test/path'))
-    # we have to add a dummy handler to add the match rule
-    iface2 = obj.get_interface(service_interface2.name)
+        obj = bus2.get_proxy_object('test.signals.name2', '/test/path',
+                                    bus3._introspect_export_path('/test/path'))
+        # we have to add a dummy handler to add the match rule
+        iface2 = obj.get_interface(service_interface2.name)
 
-    def dummy_signal_handler(what):
-        pass
+        def dummy_signal_handler(what):
+            pass
 
-    iface2.on_some_signal(dummy_signal_handler)
-    await ping()
+        iface2.on_some_signal(dummy_signal_handler)
+        await ping()
 
-    service_interface2.SomeSignal()
-    await ping()
-    # single_counter is not incremented for signals of the second interface
-    assert single_counter == 1
+        service_interface2.SomeSignal()
+        await ping()
+        # single_counter is not incremented for signals of the second interface
+        assert single_counter == 1
 
-    interface.off_some_signal(single_handler)
-    interface.off_signal_multiple(multiple_handler)
-    iface2.off_some_signal(dummy_signal_handler)
+        interface.off_some_signal(single_handler)
+        interface.off_signal_multiple(multiple_handler)
+        iface2.off_some_signal(dummy_signal_handler)
 
-    # After `off_[signal]`, the match rule and user handler should be removed
-    await ping()
-    match_rules = await stats.call_get_all_match_rules()
-    assert bus2.unique_name in match_rules
-    bus_match_rules = match_rules[bus2.unique_name]
-    assert len(bus_match_rules) == 1
-    assert "type='signal',interface='test.interface',path='/test/path',sender='test.signals.name'" not in bus_match_rules
-    assert len(bus2._user_message_handlers) == 0
-
-    bus1.disconnect()
-    bus2.disconnect()
-    bus3.disconnect()
+        # After `off_[signal]`, the match rule and user handler should be removed
+        await ping()
+        match_rules = await stats.call_get_all_match_rules()
+        assert bus2.unique_name in match_rules
+        bus_match_rules = match_rules[bus2.unique_name]
+        assert len(bus_match_rules) == 1
+        assert "type='signal',interface='test.interface',path='/test/path',sender='test.signals.name'" not in bus_match_rules
+        assert len(bus2._user_message_handlers) == 0
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_signals_with_changing_owners():
-    well_known_name = 'test.signals.changing.name'
+  well_known_name = 'test.signals.changing.name'
 
-    bus1 = await MessageBus().connect()
-    bus2 = await MessageBus().connect()
-    bus3 = await MessageBus().connect()
+  async with MessageBus().connect() as bus1, \
+      MessageBus().connect() as bus2, \
+      MessageBus().connect() as bus3:
 
     async def ping():
         await bus1.call(

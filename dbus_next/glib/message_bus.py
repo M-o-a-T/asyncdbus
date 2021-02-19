@@ -1,4 +1,4 @@
-from .._private.unmarshaller import Unmarshaller
+from .._private.unmarshaller import Unmarshaller, MAX_UNIX_FDS
 from ..constants import BusType
 from ..message import Message
 from ..constants import MessageType, MessageFlag, NameFlag, RequestNameReply, ReleaseNameReply
@@ -9,7 +9,9 @@ from .. import introspection as intr
 from ..auth import Authenticator, AuthExternal
 
 import io
+import array
 from typing import Callable, Optional
+from socket import CMSG_LEN
 
 # glib is optional
 _import_error = None
@@ -25,7 +27,7 @@ except ImportError as e:
 
 class _MessageSource(_GLibSource):
     def __init__(self, bus):
-        self.unmarshaller = None
+        self.unmarshaller = Unmarshaller()
         self.bus = bus
 
     def prepare(self):
@@ -35,16 +37,23 @@ class _MessageSource(_GLibSource):
         return False
 
     def dispatch(self, callback, user_data):
+        msg = None
+        unix_fd_list = array.array("i")
         try:
-            while self.bus._stream.readable():
-                if not self.unmarshaller:
-                    self.unmarshaller = Unmarshaller(self.bus._stream)
-
-                if self.unmarshaller.unmarshall():
-                    callback(self.unmarshaller.message)
-                    self.unmarshaller = None
-                else:
+            while True:
+                while True:
+                    msg = self.unmarshaller.unmarshall()
+                    if msg is None:
+                        break
+                    callback(msg)
+                try:
+                    data, ancdata, *_ = self.bus._sock.recvmsg(
+                        4096, CMSG_LEN(MAX_UNIX_FDS * unix_fd_list.itemsize))
+                except BlockingIOError:
                     break
+                if not data:
+                    raise EOFError()
+                self.unmarshaller.feed(data, ancdata)
         except Exception as e:
             self.bus.disconnect()
             self.bus._finalize(e)
@@ -163,6 +172,11 @@ class MessageBus(BaseMessageBus):
         else:
             self._auth = auth
 
+    def _setup_socket(self):
+        super()._setup_socket()
+        self._fd = self._sock.fileno()
+        self._stream = self._sock.makefile('rwb')
+
     def connect(self, connect_notify: Callable[['MessageBus', Optional[Exception]], None] = None):
         """Connect this message bus to the DBus daemon.
 
@@ -174,6 +188,8 @@ class MessageBus(BaseMessageBus):
             :class:`AuthError <dbus_next.AuthError>` on authorization errors.
         :type callback: :class:`Callable`
         """
+        self._setup_socket()
+
         def authenticate_notify(exc):
             if exc is not None:
                 if connect_notify is not None:
@@ -227,6 +243,8 @@ class MessageBus(BaseMessageBus):
               the DBus daemon failed.
             - :class:`Exception` - If there was a connection error.
         """
+        self._setup_socket()
+
         main = GLib.MainLoop()
         connection_error = None
 

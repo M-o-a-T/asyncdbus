@@ -80,8 +80,8 @@ def test_marshalling_with_table():
 def test_unmarshalling_with_table():
     for item in table:
 
-        stream = io.BytesIO(bytes.fromhex(item['data']))
-        unmarshaller = Unmarshaller(stream)
+        unmarshaller = Unmarshaller()
+        unmarshaller.feed(bytes.fromhex(item['data']))
         try:
             unmarshaller.unmarshall()
         except Exception as e:
@@ -108,5 +108,7 @@ def test_ay_buffer():
     body = [bytes(10000)]
     msg = Message(path='/test', member='test', signature='ay', body=body)
     marshalled = msg._marshall()
-    unmarshalled_msg = Unmarshaller(io.BytesIO(marshalled)).unmarshall()
+    unmarshaller = Unmarshaller()
+    unmarshaller.feed(marshalled)
+    unmarshalled_msg = unmarshaller.unmarshall()
     assert unmarshalled_msg.body[0] == body[0]

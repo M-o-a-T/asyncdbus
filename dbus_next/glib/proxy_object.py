@@ -271,7 +271,7 @@ class ProxyInterface(BaseProxyInterface):
 
 
 class ProxyObject(BaseProxyObject):
-    """The proxy object implementation for the asyncio :class:`MessageBus <dbus_next.aio.MessageBus>`.
+    """The proxy object implementation for the async :class:`MessageBus <dbus_next.aio.MessageBus>`.
 
     For more information, see the :class:`BaseProxyObject <dbus_next.proxy_object.BaseProxyObject>`.
     """

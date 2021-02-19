@@ -3,54 +3,41 @@ from dbus_next import Message
 
 import os
 import pytest
-import functools
+import anyio
 
 
-@pytest.mark.asyncio
-async def test_bus_disconnect_before_reply(event_loop):
-    '''In this test, the bus disconnects before the reply comes in. Make sure
-    the caller receives a reply with the error instead of hanging.'''
-    bus = MessageBus()
-    assert not bus.connected
-    await bus.connect()
+@pytest.mark.anyio
+async def test_bus_disconnect_before_reply():
+  '''In this test, the bus disconnects before the reply comes in. Make sure
+  the caller receives a reply with the error instead of hanging.'''
+  bus = MessageBus()
+  assert not bus.connected
+  async with bus.connect():
     assert bus.connected
 
-    ping = bus.call(
-        Message(destination='org.freedesktop.DBus',
-                path='/org/freedesktop/DBus',
-                interface='org.freedesktop.DBus',
-                member='Ping'))
+    await bus.disconnect()
+    # This actually cancels the current scope.
 
-    event_loop.call_soon(bus.disconnect)
-
-    with pytest.raises((EOFError, BrokenPipeError)):
-        await ping
-
-    assert bus._disconnected
-    assert not bus.connected
-    assert (await bus.wait_for_disconnect()) is None
+    assert False, "Not called"
 
 
-@pytest.mark.asyncio
-async def test_unexpected_disconnect(event_loop):
+@pytest.mark.anyio
+async def test_unexpected_disconnect():
     bus = MessageBus()
     assert not bus.connected
-    await bus.connect()
-    assert bus.connected
+    with pytest.raises(anyio.BrokenResourceError):
+        async with bus.connect():
+            assert bus.connected
 
-    ping = bus.call(
-        Message(destination='org.freedesktop.DBus',
-                path='/org/freedesktop/DBus',
-                interface='org.freedesktop.DBus',
-                member='Ping'))
+            ping = bus.call(
+                Message(destination='org.freedesktop.DBus',
+                        path='/org/freedesktop/DBus',
+                        interface='org.freedesktop.DBus',
+                        member='Ping'))
 
-    event_loop.call_soon(functools.partial(os.close, bus._fd))
+            os.close(bus._fd)
 
-    with pytest.raises(OSError):
-        await ping
-
-    assert bus._disconnected
-    assert not bus.connected
-
-    with pytest.raises(OSError):
-        await bus.wait_for_disconnect()
+            # The actual async call will cancel this scope
+            # and re-raise the error when leaving the context
+            await ping
+            assert False, "Not called"

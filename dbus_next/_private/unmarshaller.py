@@ -17,12 +17,11 @@ class MarshallerStreamEndError(Exception):
 
 
 class Unmarshaller:
-    def __init__(self, stream, sock=None):
+    def __init__(self):
         self.unix_fds = []
         self.buf = bytearray()
+        self.start = 0
         self.offset = 0
-        self.stream = stream
-        self.sock = sock
         self.endian = None
         self.message = None
 
@@ -46,61 +45,53 @@ class Unmarshaller:
             'v': self.read_variant
         }
 
-    def read(self, n, prefetch=False):
+    def feed(self, data: bytes, ancdata=()):
         """
-        Read from underlying socket into buffer and advance offset accordingly.
+        Add these bytes to the unmarshaller's input buffer.
+        """
+        self.buf.extend(data)
+        for level, type_, data in ancdata:
+            if level == socket.SOL_SOCKET and type_ == socket.SCM_RIGHTS:
+                unix_fd_list = array.array("i")
+                unix_fd_list.frombytes(data[:len(data) - (len(data) % unix_fd_list.itemsize)])
+                self.unix_fds.extend(list(unix_fd_list))
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        """
+        Decode the next message. Stops iteration if the buffer doesn't
+        contain a complete message.
+        """
+        msg = self.unmarshall()
+        if msg is None:
+            raise StopIteration
+        return msg
+
+    def read(self, n):
+        """
+        Return data from underlying buffer and advance offset accordingly.
 
         :arg n:
             Number of bytes to read. If not enough bytes are available in the
             buffer, read more from it.
-        :arg prefetch:
-            Do not update current offset after reading.
 
         :returns:
-            Previous offset (before reading). To get the actual read bytes,
+            The previous offset (before reading). To get the actual read bytes,
             use the returned value and self.buf.
         """
-        def read_sock(length):
-            '''reads from the socket, storing any fds sent and handling errors
-            from the read itself'''
-            if self.sock is not None:
-                unix_fd_list = array.array("i")
-
-                try:
-                    msg, ancdata, *_ = self.sock.recvmsg(
-                        length, socket.CMSG_LEN(MAX_UNIX_FDS * unix_fd_list.itemsize))
-                except BlockingIOError:
-                    raise MarshallerStreamEndError()
-
-                for level, type_, data in ancdata:
-                    if not (level == socket.SOL_SOCKET and type_ == socket.SCM_RIGHTS):
-                        continue
-                    unix_fd_list.frombytes(data[:len(data) - (len(data) % unix_fd_list.itemsize)])
-                    self.unix_fds.extend(list(unix_fd_list))
-
-                return msg
-            else:
-                return self.stream.read(length)
-
         # store previously read data in a buffer so we can resume on socket
         # interruptions
-        missing_bytes = n - (len(self.buf) - self.offset)
-        if missing_bytes > 0:
-            data = read_sock(missing_bytes)
-            if data == b'':
-                raise EOFError()
-            elif data is None:
-                raise MarshallerStreamEndError()
-            self.buf.extend(data)
-            if len(data) != missing_bytes:
-                raise MarshallerStreamEndError()
-        prev = self.offset
-        if not prefetch:
-            self.offset += n
-        return prev
+        off = self.offset
+        new_off = off + n
+        if new_off > len(self.buf):
+            raise MarshallerStreamEndError
 
-    @staticmethod
-    def _padding(offset, align):
+        self.offset = new_off
+        return off
+
+    def _padding(self, offset, align):
         """
         Get padding bytes to get to the next align bytes mark.
 
@@ -116,8 +107,12 @@ class Unmarshaller:
         Which can be simplified to:
 
             (-offset) & (align - 1)
+
+        where ``offset`` is ``self.offset-self.start`` because there may be
+        a previous message with non-aligned length in the buffer, in front
+        of the current one.
         """
-        return (-offset) & (align - 1)
+        return (self.start-offset) & (align - 1)
 
     def align(self, n):
         padding = self._padding(self.offset, n)
@@ -239,8 +234,6 @@ class Unmarshaller:
         return self.readers[t](type_)
 
     def _unmarshall(self):
-        self.offset = 0
-        self.read(16, prefetch=True)
         self.endian = self.read_byte()
         if self.endian != LITTLE_ENDIAN and self.endian != BIG_ENDIAN:
             raise InvalidMessageError('Expecting endianness as the first byte')
@@ -257,7 +250,6 @@ class Unmarshaller:
 
         header_len = self.read_uint32()
         msg_len = header_len + self._padding(header_len, 8) + body_len
-        self.read(msg_len, prefetch=True)
         # backtrack offset since header array length needs to be read again
         self.offset -= 4
 
@@ -298,10 +290,18 @@ class Unmarshaller:
                                signature=signature_tree,
                                body=body,
                                serial=serial)
+        self.unix_fds = []
 
     def unmarshall(self):
+        self.offset = self.start
         try:
             self._unmarshall()
-            return self.message
         except MarshallerStreamEndError:
             return None
+        else:
+            # Clean up the buffer
+            if self.offset > 4096 or self.offset == len(self.buf):
+                del self.buf[:self.offset]
+                self.offset = 0
+            self.start = self.offset
+            return self.message

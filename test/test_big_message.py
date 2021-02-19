@@ -16,11 +16,11 @@ class ExampleInterface(ServiceInterface):
         return what
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_aio_big_message():
-    'this tests that nonblocking reads and writes actually work for aio'
-    bus1 = await aio.MessageBus().connect()
-    bus2 = await aio.MessageBus().connect()
+  'this tests that nonblocking reads and writes actually work for aio'
+  async with aio.MessageBus().connect() as bus1, \
+          aio.MessageBus().connect() as bus2:
     interface = ExampleInterface()
     bus1.export('/test/path', interface)
 

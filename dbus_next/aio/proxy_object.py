@@ -13,12 +13,12 @@ from typing import Union, List
 
 class ProxyInterface(BaseProxyInterface):
     """A class representing a proxy to an interface exported on the bus by
-    another client for the asyncio :class:`MessageBus
+    another client for the async :class:`MessageBus
     <dbus_next.aio.MessageBus>` implementation.
 
     This class is not meant to be constructed directly by the user. Use
     :func:`ProxyObject.get_interface()
-    <dbus_next.aio.ProxyObject.get_interface>` on a asyncio proxy object to get
+    <dbus_next.aio.ProxyObject.get_interface>` on a async proxy object to get
     a proxy interface.
 
     This class exposes methods to call DBus methods, listen to signals, and get

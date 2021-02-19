@@ -7,7 +7,7 @@ from dbus_next.service import ServiceInterface, method, signal, dbus_property
 from dbus_next.aio.message_bus import MessageBus
 from dbus_next import Variant
 
-import asyncio
+import anyio
 
 
 class ExampleInterface(ServiceInterface):
@@ -53,12 +53,13 @@ async def main():
     path = '/example/path'
     interface_name = 'example.interface'
 
-    bus = await MessageBus().connect()
-    interface = ExampleInterface(interface_name)
-    bus.export('/example/path', interface)
-    await bus.request_name(name)
-    print(f'service up on name: "{name}", path: "{path}", interface: "{interface_name}"')
-    await bus.wait_for_disconnect()
+    async with MessageBus().connect() as bus:
+        interface = ExampleInterface(interface_name)
+        bus.export('/example/path', interface)
+        await bus.request_name(name)
+        print(f'service up on name: "{name}", path: "{path}", interface: "{interface_name}"')
+        await bus.wait_for_disconnect()
+        # not reached unless the dbus daemon is killed / disconnects us
 
 
-asyncio.get_event_loop().run_until_complete(main())
+anyio.run(main)

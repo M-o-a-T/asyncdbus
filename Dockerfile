@@ -29,7 +29,6 @@ RUN pip3 install yapf flake8 && \
     for py in python3 python3.6 python3.7 python3.9; do \
         $py -m pip install \
             pytest \
-            pytest-asyncio \
             pytest-timeout \
             pytest-cov; \
     done

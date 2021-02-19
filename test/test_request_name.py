@@ -6,12 +6,12 @@ import pytest
 has_gi = check_gi_repository()
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_name_requests():
-    test_name = 'aio.test.request.name'
+  test_name = 'aio.test.request.name'
 
-    bus1 = await aio.MessageBus().connect()
-    bus2 = await aio.MessageBus().connect()
+  async with aio.MessageBus().connect() as bus1, \
+          aio.MessageBus().connect() as bus2:
 
     async def get_name_owner(name):
         reply = await bus1.call(

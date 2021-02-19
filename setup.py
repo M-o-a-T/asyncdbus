@@ -7,7 +7,7 @@ import os
 from setuptools import setup, find_packages
 
 # Package meta-data.
-DESCRIPTION = 'A zero-dependency DBus library for Python with asyncio support'
+DESCRIPTION = 'A zero-dependency DBus library for Python with async support'
 REQUIRES_PYTHON = '>=3.6.0'
 
 # What packages are required for this module to be executed?
@@ -53,6 +53,7 @@ setup(
         'Topic :: Desktop Environment :: Gnome',
         'Topic :: Software Development :: Embedded Systems',
         'Framework :: AsyncIO',
+        'Framework :: Trio',
         'License :: OSI Approved :: MIT License',
         'Programming Language :: Python',
         'Programming Language :: Python :: 3',

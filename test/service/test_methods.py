@@ -98,10 +98,10 @@ class AsyncInterface(ServiceInterface):
 
 
 @pytest.mark.parametrize('interface_class', [ExampleInterface, AsyncInterface])
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_methods(interface_class):
-    bus1 = await MessageBus().connect()
-    bus2 = await MessageBus().connect()
+  async with MessageBus().connect() as bus1, \
+          MessageBus().connect() as bus2:
 
     interface = interface_class('test.interface')
     export_path = '/test/path'

@@ -83,8 +83,6 @@ class BaseMessageBus:
         # machine id is lazy loaded
         self._machine_id = None
 
-        self._setup_socket()
-
     @property
     def connected(self):
         if self.unique_name is None or self._disconnected or self._user_disconnect:
@@ -375,7 +373,7 @@ class BaseMessageBus:
     def disconnect(self):
         """Disconnect the message bus by closing the underlying connection asynchronously.
 
-        All pending  and future calls will error with a connection error.
+        All pending and future calls will error with a connection error.
         """
         self._user_disconnect = True
         try:
@@ -528,8 +526,6 @@ class BaseMessageBus:
 
             if transport == 'unix':
                 self._sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-                self._stream = self._sock.makefile('rwb')
-                self._fd = self._sock.fileno()
 
                 if 'path' in options:
                     filename = options['path']
@@ -547,8 +543,6 @@ class BaseMessageBus:
 
             elif transport == 'tcp':
                 self._sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                self._stream = self._sock.makefile('rwb')
-                self._fd = self._sock.fileno()
 
                 if 'host' in options:
                     ip_addr = options['host']
@@ -713,8 +707,8 @@ class BaseMessageBus:
                     handler(msg, None)
                 del self._method_return_handlers[msg.reply_serial]
 
-    @classmethod
-    def _make_method_handler(cls, interface, method):
+    @staticmethod
+    def _make_method_handler(interface, method):
         def handler(msg, send_reply):
             args = ServiceInterface._msg_body_to_args(msg)
             result = method.fn(interface, *args)
@@ -730,19 +724,19 @@ class BaseMessageBus:
         if msg._matches(interface='org.freedesktop.DBus.Introspectable',
                         member='Introspect',
                         signature=''):
-            handler = self._default_introspect_handler
+            return self._default_introspect_handler
 
         elif msg._matches(interface='org.freedesktop.DBus.Properties'):
-            handler = self._default_properties_handler
+            return self._default_properties_handler
 
         elif msg._matches(interface='org.freedesktop.DBus.Peer'):
             if msg._matches(member='Ping', signature=''):
-                handler = self._default_ping_handler
+                return self._default_ping_handler
             elif msg._matches(member='GetMachineId', signature=''):
-                handler = self._default_get_machine_id_handler
+                return self._default_get_machine_id_handler
         elif msg._matches(interface='org.freedesktop.DBus.ObjectManager',
                           member='GetManagedObjects'):
-            handler = self._default_get_managed_objects_handler
+            return self._default_get_managed_objects_handler
 
         else:
             for interface in self._path_exports.get(msg.path, []):
@@ -752,12 +746,9 @@ class BaseMessageBus:
                     if msg._matches(interface=interface.name,
                                     member=method.name,
                                     signature=method.in_signature):
-                        handler = self._make_method_handler(interface, method)
-                        break
-                if handler:
-                    break
+                        return self._make_method_handler(interface, method)
 
-        return handler
+        return None
 
     def _default_introspect_handler(self, msg, send_reply):
         introspection = self._introspect_export_path(msg.path).tostring()

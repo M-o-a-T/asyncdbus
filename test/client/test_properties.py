@@ -36,13 +36,13 @@ class ExampleInterface(ServiceInterface):
         raise DBusError(self.error_name, self.error_text)
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_aio_properties():
-    service_bus = await aio.MessageBus().connect()
-    service_interface = ExampleInterface()
-    service_bus.export('/test/path', service_interface)
+  async with aio.MessageBus().connect() as service_bus:
+   service_interface = ExampleInterface()
+   service_bus.export('/test/path', service_interface)
 
-    bus = await aio.MessageBus().connect()
+   async with aio.MessageBus().connect() as bus:
     obj = bus.get_proxy_object(service_bus.unique_name, '/test/path',
                                service_bus._introspect_export_path('/test/path'))
     interface = obj.get_interface(service_interface.name)
@@ -74,9 +74,6 @@ async def test_aio_properties():
             assert e.text == service_interface.error_text
             assert type(e.reply) is Message
             raise e
-
-    service_bus.disconnect()
-    bus.disconnect()
 
 
 @pytest.mark.skipif(not has_gi, reason=skip_reason_no_gi)

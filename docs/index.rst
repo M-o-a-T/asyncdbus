@@ -30,7 +30,7 @@ Desktop users can use this library to create their own scripts and utilities to 
 While other libraries for DBus exist for Python, this library offers the following improvements:
 
 - Zero dependencies and pure Python 3.
-- Support for multiple main loop backends including asyncio and the GLib main loop.
+- Support for multiple main loop backends including anyio and the GLib main loop.
 - Nonblocking IO suitable for GUI development.
 - Target the latest language features of Python for beautiful services and clients.
 - Complete implementation of the DBus type system without ever guessing types.

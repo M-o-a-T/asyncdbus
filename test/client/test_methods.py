@@ -38,12 +38,12 @@ class ExampleInterface(ServiceInterface):
         raise DBusError('test.error', 'something went wrong')
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_aio_proxy_object():
-    bus_name = 'aio.client.test.methods'
+  bus_name = 'aio.client.test.methods'
 
-    bus = await aio.MessageBus().connect()
-    bus2 = await aio.MessageBus().connect()
+  async with aio.MessageBus().connect() as bus, \
+          aio.MessageBus().connect() as bus2:
     await bus.request_name(bus_name)
     service_interface = ExampleInterface()
     bus.export('/test/path', service_interface)
@@ -87,9 +87,6 @@ async def test_aio_proxy_object():
             assert e.type == 'test.error'
             assert e.text == 'something went wrong'
             raise e
-
-    bus.disconnect()
-    bus2.disconnect()
 
 
 @pytest.mark.skipif(not has_gi, reason=skip_reason_no_gi)

@@ -1,9 +1,9 @@
 from dbus_next.service import ServiceInterface, dbus_property, method
-from dbus_next.aio import MessageBus
+from dbus_next.aio import MessageBus, ValueEvent
 from dbus_next import Message, MessageType, PropertyAccess, ErrorType, Variant, DBusError
 
 import pytest
-import asyncio
+import anyio
 
 
 class ExampleInterface(ServiceInterface):
@@ -66,10 +66,10 @@ class ExampleInterface(ServiceInterface):
         self.emit_properties_changed(changed, invalidated)
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_property_methods():
-    bus1 = await MessageBus().connect()
-    bus2 = await MessageBus().connect()
+  async with MessageBus().connect() as bus1, \
+          MessageBus().connect() as bus2:
 
     interface = ExampleInterface('test.interface')
     export_path = '/test/path'
@@ -151,10 +151,10 @@ async def test_property_methods():
     assert result.body == ['told you so']
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_property_changed_signal():
-    bus1 = await MessageBus().connect()
-    bus2 = await MessageBus().connect()
+  async with MessageBus().connect() as bus1, \
+          MessageBus().connect() as bus2:
 
     await bus2.call(
         Message(destination='org.freedesktop.DBus',
@@ -170,12 +170,12 @@ async def test_property_changed_signal():
 
     async def wait_for_message():
         # TODO timeout
-        future = asyncio.get_event_loop().create_future()
+        future = ValueEvent()
 
         def message_handler(signal):
             if signal.interface == 'org.freedesktop.DBus.Properties':
                 bus2.remove_message_handler(message_handler)
-                future.set_result(signal)
+                future.set(signal)
 
         bus2.add_message_handler(message_handler)
         return await future

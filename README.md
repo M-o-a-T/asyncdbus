@@ -15,7 +15,7 @@ Desktop users can use this library to create their own scripts and utilities to 
 python-dbus-next plans to improve over other DBus libraries for Python in the following ways:
 
 * Zero dependencies and pure Python 3.
-* Support for multiple IO backends including asyncio and the GLib main loop.
+* Support for multiple IO backends including anyio and the GLib main loop.
 * Nonblocking IO suitable for GUI development.
 * Target the latest language features of Python for beautiful services and clients.
 * Complete implementation of the DBus type system without ever guessing types.
@@ -41,9 +41,7 @@ This example connects to a media player and controls it with the [MPRIS](https:/
 ```python
 from dbus_next.aio import MessageBus
 
-import asyncio
-
-loop = asyncio.get_event_loop()
+import anyio
 
 
 async def main():
@@ -71,9 +69,9 @@ async def main():
 
     properties.on_properties_changed(on_properties_changed)
 
-    await loop.create_future()
+    await anyio.sleep(99999)
 
-loop.run_until_complete(main())
+anyio.run(main)
 ```
 
 ## The Service Interface
@@ -86,7 +84,7 @@ For more information, see the [overview for the high-level service](https://pyth
 from dbus_next.service import ServiceInterface, method, dbus_property, signal, Variant
 from dbus_next.aio MessageBus
 
-import asyncio
+import anyio
 
 class ExampleInterface(ServiceInterface):
     def __init__(self, name):
@@ -124,9 +122,9 @@ async def main():
     # now that we are ready to handle requests, we can request name from D-Bus
     await bus.request_name('test.name')
     # wait indefinitely
-    await asyncio.get_event_loop().create_future()
+    await anyio.sleep(99999)
 
-asyncio.get_event_loop().run_until_complete(main())
+anyio.run(main)
 ```
 
 ## The Low-Level Interface
@@ -139,10 +137,8 @@ For more information, see the [overview for the low-level interface](https://pyt
 from dbus_next.message import Message, MessageType
 from dbus_next.aio import MessageBus
 
-import asyncio
+import anyio
 import json
-
-loop = asyncio.get_event_loop()
 
 
 async def main():
@@ -160,7 +156,7 @@ async def main():
     print(json.dumps(reply.body[0], indent=2))
 
 
-loop.run_until_complete(main())
+anyio.run(main)
 ```
 
 ## Projects that use python-dbus-next

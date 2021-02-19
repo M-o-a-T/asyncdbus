@@ -17,15 +17,15 @@ class ExampleInterface(ServiceInterface):
         self._method_called = True
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_export_unexport():
-    interface = ExampleInterface('test.interface')
-    interface2 = ExampleInterface('test.interface2')
+  interface = ExampleInterface('test.interface')
+  interface2 = ExampleInterface('test.interface2')
 
-    export_path = '/test/path'
-    export_path2 = '/test/path/child'
+  export_path = '/test/path'
+  export_path2 = '/test/path/child'
 
-    bus = await MessageBus().connect()
+  async with MessageBus().connect() as bus:
     bus.export(export_path, interface)
     assert export_path in bus._path_exports
     assert len(bus._path_exports[export_path]) == 1
@@ -65,9 +65,9 @@ async def test_export_unexport():
     assert not node.nodes
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_export_alias():
-    bus = await MessageBus().connect()
+  async with MessageBus().connect() as bus:
 
     interface = ExampleInterface('test.interface')
 
@@ -96,7 +96,7 @@ async def test_export_alias():
     assert interface._method_called
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_export_introspection():
     interface = ExampleInterface('test.interface')
     interface2 = ExampleInterface('test.interface2')
@@ -104,9 +104,9 @@ async def test_export_introspection():
     export_path = '/test/path'
     export_path2 = '/test/path/child'
 
-    bus = await MessageBus().connect()
-    bus.export(export_path, interface)
-    bus.export(export_path2, interface2)
+    async with MessageBus().connect() as bus:
+        bus.export(export_path, interface)
+        bus.export(export_path2, interface2)
 
-    root = bus._introspect_export_path('/')
-    assert len(root.nodes) == 1
+        root = bus._introspect_export_path('/')
+        assert len(root.nodes) == 1

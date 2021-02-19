@@ -33,7 +33,7 @@ If any file descriptors are sent or received (DBus type ``h``), the variable ref
                                    method, dbus_property, signal)
     from dbus_next import Variant, DBusError
 
-    import asyncio
+    import anyio
 
     class ExampleInterface(ServiceInterface):
         def __init__(self):
@@ -78,16 +78,17 @@ If any file descriptors are sent or received (DBus type ``h``), the variable ref
             self.emit_properties_changed({'Bar': self._bar})
 
     async def main():
-        bus = await MessageBus().connect()
-        interface = ExampleInterface()
-        bus.export('/com/example/sample0', interface)
-        await bus.request_name('com.example.name')
+        async with MessageBus().connect() as bus:
+            interface = ExampleInterface()
+            bus.export('/com/example/sample0', interface)
+            await bus.request_name('com.example.name')
 
-        # emit the changed signal after two seconds.
-        await asyncio.sleep(2)
+            # emit the changed signal after two seconds.
+            await anyio.sleep(2)
 
-        interface.changed()
+            interface.changed()
 
-        await bus.wait_for_disconnect()
+            await bus.wait_for_disconnect()
+            # not reached unless somebody kills dbus
 
-    asyncio.get_event_loop().run_until_complete(main())
+    anyio.run(main)

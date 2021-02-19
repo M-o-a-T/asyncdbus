@@ -10,8 +10,6 @@ from dbus_next import MessageType, BusType, Message, Variant
 from argparse import ArgumentParser, OPTIONAL
 import json
 
-import asyncio
-
 parser = ArgumentParser()
 
 parser.add_argument('--system', help='Use the system bus', action='store_true')
@@ -89,36 +87,34 @@ else:
     if not signature:
         exit_error('--signature is a required argument when passing a message body')
 
-loop = asyncio.get_event_loop()
-
 
 async def main():
-    bus = await MessageBus(bus_type=bus_type).connect()
+    async with MessageBus(bus_type=bus_type).connect() as bus:
 
-    message = Message(destination=destination,
-                      member=member,
-                      interface=interface,
-                      path=object_path,
-                      signature=signature,
-                      body=body)
+        message = Message(destination=destination,
+                        member=member,
+                        interface=interface,
+                        path=object_path,
+                        signature=signature,
+                        body=body)
 
-    result = await bus.call(message)
+        result = await bus.call(message)
 
-    ret = 0
+        ret = 0
 
-    if result.message_type is MessageType.ERROR:
-        print(f'Error: {result.error_name}', file=sys.stderr)
-        ret = 1
+        if result.message_type is MessageType.ERROR:
+            print(f'Error: {result.error_name}', file=sys.stderr)
+            ret = 1
 
-    def default(o):
-        if type(o) is Variant:
-            return [o.signature, o.value]
-        else:
-            raise json.JSONDecodeError()
+        def default(o):
+            if type(o) is Variant:
+                return [o.signature, o.value]
+            else:
+                raise json.JSONDecodeError()
 
-    print(json.dumps(result.body, indent=2, default=default))
+        print(json.dumps(result.body, indent=2, default=default))
 
     sys.exit(ret)
 
 
-loop.run_until_complete(main())
+anyio.run(main)

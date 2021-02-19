@@ -1,7 +1,7 @@
 """This tests the ability to send and receive file descriptors in dbus messages"""
 from dbus_next.service import ServiceInterface, method, signal, dbus_property
 from dbus_next.signature import SignatureTree, Variant
-from dbus_next.aio import MessageBus
+from dbus_next.aio import MessageBus, ValueEvent
 from dbus_next import Message, MessageType
 import os
 
@@ -67,10 +67,10 @@ def assert_fds_equal(fd1, fd2):
     assert stat1.st_rdev == stat2.st_rdev
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_sending_file_descriptor_low_level():
-    bus1 = await MessageBus(negotiate_unix_fd=True).connect()
-    bus2 = await MessageBus(negotiate_unix_fd=True).connect()
+  async with MessageBus(negotiate_unix_fd=True).connect() as bus1, \
+          MessageBus(negotiate_unix_fd=True).connect() as bus2:
 
     fd_before = open_file()
     fd_after = None
@@ -111,10 +111,10 @@ async def test_sending_file_descriptor_low_level():
         bus.disconnect()
 
 
-@pytest.mark.asyncio
-async def test_high_level_service_fd_passing(event_loop):
-    bus1 = await MessageBus(negotiate_unix_fd=True).connect()
-    bus2 = await MessageBus(negotiate_unix_fd=True).connect()
+@pytest.mark.anyio
+async def test_high_level_service_fd_passing():
+  async with MessageBus(negotiate_unix_fd=True).connect() as bus1, \
+          MessageBus(negotiate_unix_fd=True).connect() as bus2:
 
     interface_name = 'test.interface'
     interface = ExampleInterface(interface_name)
@@ -151,7 +151,7 @@ async def test_high_level_service_fd_passing(event_loop):
     os.close(fd)
 
     # signals
-    fut = event_loop.create_future()
+    fut = ValueEvent()
 
     def fd_listener(msg):
         if msg.sender == bus1.unique_name and msg.message_type == MessageType.SIGNAL:
@@ -169,7 +169,7 @@ async def test_high_level_service_fd_passing(event_loop):
     interface.SignalFd()
     reply = await fut
 
-    assert len(reply.unix_fds) == 1
+    assert len(reply.unix_fds) == 1, (reply.unix_fds,interface.get_last_fd())
     assert reply.body == [0]
     assert_fds_equal(reply.unix_fds[0], interface.get_last_fd())
 
@@ -211,13 +211,13 @@ async def test_high_level_service_fd_passing(event_loop):
         bus.disconnect()
 
 
-@pytest.mark.asyncio
-async def test_sending_file_descriptor_with_proxy(event_loop):
-    name = 'dbus.next.test.service'
-    path = '/test/path'
-    interface_name = 'test.interface'
+@pytest.mark.anyio
+async def test_sending_file_descriptor_with_proxy():
+  name = 'dbus.next.test.service'
+  path = '/test/path'
+  interface_name = 'test.interface'
 
-    bus = await MessageBus(negotiate_unix_fd=True).connect()
+  async with MessageBus(negotiate_unix_fd=True).connect() as bus:
 
     interface = ExampleInterface(interface_name)
     bus.export(path, interface)
@@ -251,7 +251,7 @@ async def test_sending_file_descriptor_with_proxy(event_loop):
     interface.cleanup()
     os.close(fd)
 
-    fut = event_loop.create_future()
+    fut = ValueEvent()
 
     def on_signal_fd(fd):
         fut.set_result(fd)
@@ -265,7 +265,7 @@ async def test_sending_file_descriptor_with_proxy(event_loop):
     os.close(fd)
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 @pytest.mark.parametrize(
     "result, out_signature, expected",
     [

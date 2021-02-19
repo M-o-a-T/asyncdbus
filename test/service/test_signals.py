@@ -1,11 +1,12 @@
 from dbus_next.service import ServiceInterface, signal, SignalDisabledError, dbus_property
-from dbus_next.aio import MessageBus
+from dbus_next.aio import MessageBus, ValueEvent
 from dbus_next import Message, MessageType
 from dbus_next.constants import PropertyAccess
 from dbus_next.signature import Variant
 
 import pytest
-import asyncio
+import anyio
+from contextlib import asynccontextmanager
 
 
 class ExampleInterface(ServiceInterface):
@@ -54,30 +55,46 @@ class SecondExampleInterface(ServiceInterface):
 
 class ExpectMessage:
     def __init__(self, bus1, bus2, interface_name, timeout=1):
-        self.future = asyncio.get_event_loop().create_future()
+        self.future = ValueEvent()
         self.bus1 = bus1
         self.bus2 = bus2
         self.interface_name = interface_name
         self.timeout = timeout
         self.timeout_task = None
+        self._ctx_ = None
 
     def message_handler(self, msg):
         if msg.sender == self.bus1.unique_name and msg.interface == self.interface_name:
             self.timeout_task.cancel()
-            self.future.set_result(msg)
+            self.future.set(msg)
             return True
 
-    def timeout_cb(self):
-        self.future.set_exception(TimeoutError)
+    async def timeout_handler(self, *, task_status):
+        with anyio.open_cancel_scope() as self.timeout_task:
+            task_status.started()
+            await anyio.sleep(self.timeout)
+            self.future.set_error(TimeoutError)
+
+    @asynccontextmanager
+    async def _ctx(self):
+        self.bus2.add_message_handler(self.message_handler)
+        try:
+            async with anyio.create_task_group() as tg:
+                await tg.start(self.timeout_handler)
+                yield self.future
+                tg.cancel_scope.cancel()
+        finally:
+            self.bus2.remove_message_handler(self.message_handler)
 
     async def __aenter__(self):
-        self.bus2.add_message_handler(self.message_handler)
-        self.timeout_task = asyncio.get_event_loop().call_later(self.timeout, self.timeout_cb)
+        if self._ctx_ is not None:
+            raise RuntimeError("A ScopeSet can only be used once")
+        self._ctx_ = self._ctx()
+        return await self._ctx_.__aenter__()
 
-        return self.future
-
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
-        self.bus2.remove_message_handler(self.message_handler)
+    async def __aexit__(self, *tb):
+        ctx, self._ctx_ = self._ctx_, None
+        return await ctx.__aexit__(*tb)  # pylint:disable=no-member  # YES IT HAS
 
 
 def assert_signal_ok(signal, export_path, member, signature, body):
@@ -88,10 +105,10 @@ def assert_signal_ok(signal, export_path, member, signature, body):
     assert signal.body == body
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_signals():
-    bus1 = await MessageBus().connect()
-    bus2 = await MessageBus().connect()
+  async with MessageBus().connect() as bus1, \
+          MessageBus().connect() as bus2:
 
     interface = ExampleInterface('test.interface')
     export_path = '/test/path'
@@ -141,10 +158,10 @@ async def test_signals():
         interface.signal_disabled()
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_interface_add_remove_signal():
-    bus1 = await MessageBus().connect()
-    bus2 = await MessageBus().connect()
+  async with MessageBus().connect() as bus1, \
+          MessageBus().connect() as bus2:
 
     await bus2.call(
         Message(destination='org.freedesktop.DBus',

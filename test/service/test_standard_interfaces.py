@@ -29,10 +29,10 @@ class ExampleComplexInterface(ServiceInterface):
         return self._bar
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_introspectable_interface():
-    bus1 = await MessageBus().connect()
-    bus2 = await MessageBus().connect()
+  async with MessageBus().connect() as bus1, \
+          MessageBus().connect() as bus2:
 
     interface = ExampleInterface('test.interface')
     interface2 = ExampleInterface('test.interface2')
@@ -68,10 +68,10 @@ async def test_introspectable_interface():
     assert not node.nodes
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_peer_interface():
-    bus1 = await MessageBus().connect()
-    bus2 = await MessageBus().connect()
+  async with MessageBus().connect() as bus1, \
+          MessageBus().connect() as bus2:
 
     reply = await bus2.call(
         Message(destination=bus1.unique_name,
@@ -93,8 +93,10 @@ async def test_peer_interface():
     assert reply.signature == 's'
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_object_manager():
+  async with MessageBus().connect() as bus1, \
+          MessageBus().connect() as bus2:
     expected_reply = {
         '/test/path/deeper': {
             'test.interface2': {
@@ -112,9 +114,6 @@ async def test_object_manager():
             }
         }
     }
-
-    bus1 = await MessageBus().connect()
-    bus2 = await MessageBus().connect()
 
     interface = ExampleInterface('test.interface1')
     interface2 = ExampleComplexInterface('test.interface2')
@@ -152,12 +151,13 @@ async def test_object_manager():
     assert reply_root.body == [expected_reply]
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_standard_interface_properties():
     # standard interfaces have no properties, but should still behave correctly
     # when you try to call the methods anyway (#49)
-    bus1 = await MessageBus().connect()
-    bus2 = await MessageBus().connect()
+  async with MessageBus().connect() as bus1, \
+          MessageBus().connect() as bus2:
+
     interface = ExampleInterface('test.interface1')
     export_path = '/test/path'
     bus1.export(export_path, interface)

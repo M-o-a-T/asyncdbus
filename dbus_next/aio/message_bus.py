@@ -1,92 +1,93 @@
 from ..message_bus import BaseMessageBus
 from .._private.unmarshaller import Unmarshaller
 from ..message import Message
-from ..constants import BusType, NameFlag, RequestNameReply, ReleaseNameReply, MessageType, MessageFlag
+from ..constants import BusType, NameFlag, RequestNameReply, ReleaseNameReply, MessageType, MessageFlag, ErrorType
 from ..service import ServiceInterface
-from ..errors import AuthError
+from ..errors import AuthError, DBusError
 from .proxy_object import ProxyObject
 from .. import introspection as intr
 from ..auth import Authenticator, AuthExternal
 
 import logging
 import array
-import asyncio
-from asyncio import Queue
+import anyio
 import socket
+import inspect
 from copy import copy
 from typing import Optional
+from contextlib import asynccontextmanager
+from concurrent.futures import CancelledError
+import outcome
+import attr
+import traceback
 
 
-def _future_set_exception(fut, exc):
-    if fut is not None and not fut.done():
-        fut.set_exception(exc)
+@attr.s
+class ValueEvent:
+    """A waitable value useful for inter-task synchronization,
+    inspired by :class:`threading.Event`.
 
+    An event object manages an internal value, which is initially
+    unset, and a task can wait for it to become True.
 
-def _future_set_result(fut, result):
-    if fut is not None and not fut.done():
-        fut.set_result(result)
+    Note that the value can only be read once.
+    """
 
+    event = attr.ib(factory=anyio.create_event, init=False)
+    value = attr.ib(default=None, init=False)
 
-class _MessageWriter:
-    def __init__(self, bus):
-        self.messages = Queue()
-        self.negotiate_unix_fd = bus._negotiate_unix_fd
-        self.bus = bus
-        self.sock = bus._sock
-        self.loop = bus._loop
-        self.buf = None
-        self.fd = bus._fd
-        self.offset = 0
-        self.unix_fds = None
-        self.fut = None
+    def set(self, value):
+        """Set the result to return this value, and wake any waiting task."""
+        if self.value is not None:
+            return
+        self.value = outcome.Value(value)
+        self.event.set()
 
-    def write_callback(self):
-        try:
-            while True:
-                if self.buf is None:
-                    if self.messages.qsize() == 0:
-                        # nothing more to write
-                        self.loop.remove_writer(self.fd)
-                        return
-                    buf, unix_fds, fut = self.messages.get_nowait()
-                    self.unix_fds = unix_fds
-                    self.buf = memoryview(buf)
-                    self.offset = 0
-                    self.fut = fut
+    def set_error(self, exc):
+        """Set the result to raise this exception, and wake any waiting task."""
+        if self.value is not None:
+            return
+        self.value = outcome.Error(exc)
+        self.event.set()
 
-                if self.unix_fds and self.negotiate_unix_fd:
-                    ancdata = [(socket.SOL_SOCKET, socket.SCM_RIGHTS,
-                                array.array("i", self.unix_fds))]
-                    self.offset += self.sock.sendmsg([self.buf[self.offset:]], ancdata)
-                    self.unix_fds = None
-                else:
-                    self.offset += self.sock.send(self.buf[self.offset:])
+    set_result = set
+    set_exception = set_error
 
-                if self.offset >= len(self.buf):
-                    # finished writing
-                    self.buf = None
-                    _future_set_result(self.fut, None)
-                else:
-                    # wait for writable
-                    return
-        except Exception as e:
-            _future_set_exception(self.fut, e)
-            self.bus._finalize(e)
+    def is_set(self):
+        """Check whether the event has occurred."""
+        return self.value is not None
 
-    def buffer_message(self, msg: Message, future=None):
-        self.messages.put_nowait(
-            (msg._marshall(negotiate_unix_fd=self.negotiate_unix_fd), copy(msg.unix_fds), future))
+    def cancel(self):
+        """Send a cancelation to the recipient.
 
-    def schedule_write(self, msg: Message = None, future=None):
-        if msg is not None:
-            self.buffer_message(msg, future)
-        if self.bus.unique_name:
-            # don't run the writer until the bus is ready to send messages
-            self.loop.add_writer(self.fd, self.write_callback)
+        TODO: Trio can't do that cleanly.
+        """
+        self.set_error(CancelledError())
+
+    async def get(self):
+        """Block until the value is set.
+
+        If it's already set, then this method returns immediately.
+
+        The value can only be read once.
+        """
+        await self.event.wait()
+        return self.value.unwrap()
+
+    def __await__(self):
+        return self.get().__await__()
+
+    def __call__(self, reply, err):
+        if self.is_set():
+            return
+        if err:
+            self.set_error(err)
+        else:
+            self.set(reply)
 
 
 class MessageBus(BaseMessageBus):
-    """The message bus implementation for use with asyncio.
+    """The message bus implementation for use with anyio.
 
     The message bus class is the entry point into all the features of the
     library. It sets up a connection to the DBus daemon and exposes an
@@ -121,22 +122,81 @@ class MessageBus(BaseMessageBus):
                  negotiate_unix_fd=False):
         super().__init__(bus_address, bus_type, ProxyObject)
         self._negotiate_unix_fd = negotiate_unix_fd
-        self._loop = asyncio.get_event_loop()
-        self._unmarshaller = self._create_unmarshaller()
 
-        self._writer = _MessageWriter(self)
+        self._reader = None
+        self._writer = None
+        self._tg = None
 
         if auth is None:
             self._auth = AuthExternal()
         else:
             self._auth = auth
 
-        self._disconnect_future = self._loop.create_future()
+        self._disconnect_future = ValueEvent()
 
+    def disconnect(self):
+        """Disconnect the message bus by closing the underlying connection asynchronously.
+        
+        All pending  and future calls will error with a connection error.  
+        """
+        self._user_disconnect = True
+        self._tg.spawn(self._disconnect)
+
+    async def _disconnect(self):
+        await self._sock.aclose()
+
+
+    async def _setup_socket_aio(self):
+        err = None
+
+        for transport, options in self._bus_address:
+
+            if transport == 'unix':
+                if 'path' in options:
+                    filename = options['path']
+                elif 'abstract' in options:
+                    filename = f'\0{options["abstract"]}'
+                else:
+                    raise InvalidAddressError('got unix transport with unknown path specifier')
+
+                try:
+                    self._sock = await anyio.connect_unix(filename)
+                except Exception as e:
+                    if err is None:
+                        err = e
+                else:
+                    break
+
+            elif transport == 'tcp':
+                ip_addr = ''
+                ip_port = 0
+
+                if 'host' in options:
+                    ip_addr = options['host']
+                if 'port' in options:
+                    ip_port = int(options['port'])
+
+                try:
+                    self._sock = await anyio.connect_tcp(ip_addr, ip_port)
+                except Exception as e:
+                    if err is None:
+                        err = e
+                else:
+                    break
+
+            else:
+                raise InvalidAddressError(f'got unknown address transport: {transport}')
+
+        if err:
+            raise err
+
+        self._fd = self._sock.extra(anyio.abc.SocketAttribute.raw_socket).fileno()
+
+    @asynccontextmanager
     async def connect(self) -> 'MessageBus':
         """Connect this message bus to the DBus daemon.
 
-        This method must be called before the message bus can be used.
+        This method is an async context manager.
 
         :returns: This message bus for convenience.
         :rtype: :class:`MessageBus <dbus_next.aio.MessageBus>`
@@ -146,35 +206,58 @@ class MessageBus(BaseMessageBus):
               the DBus daemon failed.
             - :class:`Exception` - If there was a connection error.
         """
-        await self._authenticate()
+        await self._setup_socket_aio()
+        did_yield = False
+        future = ValueEvent()
+        self._disconnect_future = ValueEvent()
 
-        future = self._loop.create_future()
+        try:
+            async with anyio.create_task_group() as tg:
+                self._tg = tg
+                await self._authenticate()
 
-        self._loop.add_reader(self._fd, self._message_reader)
+                self._write, self._write_r = anyio.create_memory_object_stream(10)
+                self._reader = await tg.start(self._message_reader)
 
-        def on_hello(reply, err):
-            try:
-                if err:
-                    raise err
-                self.unique_name = reply.body[0]
-                self._writer.schedule_write()
-                _future_set_result(future, self)
-            except Exception as e:
-                _future_set_exception(future, e)
-                self.disconnect()
-                self._finalize(err)
+                def on_hello(reply, err):
+                    try:
+                        if err:
+                            raise err
+                        self.unique_name = reply.body[0]
+                        future.set(self)
+                    except Exception as e:
+                        future.set_error(e)
+                        self.disconnect()
 
-        hello_msg = Message(destination='org.freedesktop.DBus',
-                            path='/org/freedesktop/DBus',
-                            interface='org.freedesktop.DBus',
-                            member='Hello',
-                            serial=self.next_serial())
+                hello_msg = Message(destination='org.freedesktop.DBus',
+                                    path='/org/freedesktop/DBus',
+                                    interface='org.freedesktop.DBus',
+                                    member='Hello',
+                                    serial=self.next_serial())
 
-        self._method_return_handlers[hello_msg.serial] = on_hello
-        self._stream.write(hello_msg._marshall())
-        self._stream.flush()
+                self._method_return_handlers[hello_msg.serial] = on_hello
+                await self._sock.send(hello_msg._marshall())
 
-        return await future
+                await future
+                self._writer = await tg.start(self._message_writer)
+
+                did_yield = True
+                yield self
+                tg.cancel_scope.cancel()
+                pass # close TG
+
+        except Exception as err:
+            if not did_yield:
+                raise
+            self._finalize(err)
+        except BaseException:
+            self._finalize(CancelledError())
+            raise
+        else:
+            self._finalize()
+
+        await self.wait_for_disconnect()
+
 
     async def introspect(self, bus_name: str, path: str, timeout: float = 30.0) -> intr.Node:
         """Get introspection data for the node at the given path from the given
@@ -201,19 +284,15 @@ class MessageBus(BaseMessageBus):
             - :class:`DBusError <dbus_next.DBusError>` - If the service threw \
                   an error for the method call or returned an invalid result.
             - :class:`Exception` - If a connection error occurred.
-            - :class:`asyncio.TimeoutError` - Waited for future but time run out.
+            - :class:`TimeoutError` - Waited for future but time run out.
         """
-        future = self._loop.create_future()
+        future = ValueEvent()
 
-        def reply_handler(reply, err):
-            if err:
-                _future_set_exception(future, err)
-            else:
-                _future_set_result(future, reply)
+        super().introspect(bus_name, path, future)
 
-        super().introspect(bus_name, path, reply_handler)
+        with anyio.fail_after(timeout):
+            return await future
 
-        return await asyncio.wait_for(future, timeout=timeout)
 
     async def request_name(self, name: str, flags: NameFlag = NameFlag.NONE) -> RequestNameReply:
         """Request that this message bus owns the given name.
@@ -233,15 +312,9 @@ class MessageBus(BaseMessageBus):
                   an error for the method call or returned an invalid result.
             - :class:`Exception` - If a connection error occurred.
         """
-        future = self._loop.create_future()
+        future = ValueEvent()
 
-        def reply_handler(reply, err):
-            if err:
-                _future_set_exception(future, err)
-            else:
-                _future_set_result(future, reply)
-
-        super().request_name(name, flags, reply_handler)
+        super().request_name(name, flags, future)
 
         return await future
 
@@ -261,15 +334,9 @@ class MessageBus(BaseMessageBus):
                   an error for the method call or returned an invalid result.
             - :class:`Exception` - If a connection error occurred.
         """
-        future = self._loop.create_future()
+        future = ValueEvent()
 
-        def reply_handler(reply, err):
-            if err:
-                _future_set_exception(future, err)
-            else:
-                _future_set_result(future, reply)
-
-        super().release_name(name, reply_handler)
+        super().release_name(name, future)
 
         return await future
 
@@ -291,20 +358,9 @@ class MessageBus(BaseMessageBus):
             await self.send(msg)
             return None
 
-        future = self._loop.create_future()
-
-        def reply_handler(reply, err):
-            if not future.done():
-                if err:
-                    _future_set_exception(future, err)
-                else:
-                    _future_set_result(future, reply)
-
-        self._call(msg, reply_handler)
-
-        await future
-
-        return future.result()
+        future = ValueEvent()
+        self._call(msg, future)
+        return await future
 
     def send(self, msg: Message):
         """Asynchronously send a message on the message bus.
@@ -317,13 +373,14 @@ class MessageBus(BaseMessageBus):
 
         :returns: A future that resolves when the message is sent or a
             connection error occurs.
-        :rtype: :class:`Future <asyncio.Future>`
+        :rtype: :class:`ValueEvent`
         """
         if not msg.serial:
             msg.serial = self.next_serial()
 
-        future = self._loop.create_future()
-        self._writer.schedule_write(msg, future)
+        future = ValueEvent()
+        self._schedule_write(msg, future)
+
         return future
 
     def get_proxy_object(self, bus_name: str, path: str, introspection: intr.Node) -> ProxyObject:
@@ -339,84 +396,122 @@ class MessageBus(BaseMessageBus):
             - :class:`Exception` - If connection was terminated unexpectedly or \
               an internal error occurred in the library.
         """
-        return await self._disconnect_future
+        if self._disconnect_future is True:
+            return
+        df, self._disconnect_future = self._disconnect_future, True
+        return await df
 
-    @classmethod
-    def _make_method_handler(cls, interface, method):
-        if not asyncio.iscoroutinefunction(method.fn):
-            return super()._make_method_handler(interface, method)
-
-        def handler(msg, send_reply):
-            def done(fut):
-                with send_reply:
-                    result = fut.result()
-                    body, unix_fds = ServiceInterface._fn_result_to_body(
-                        result, method.out_signature_tree)
-                    send_reply(Message.new_method_return(msg, method.out_signature, body, unix_fds))
-
+    def _make_method_handler(self, interface, method):
+        async def handler(msg, send_reply):
             args = ServiceInterface._msg_body_to_args(msg)
-            fut = asyncio.ensure_future(method.fn(interface, *args))
-            fut.add_done_callback(done)
+            try:
+                result = method.fn(interface, *args)
+                if inspect.iscoroutine(result):
+                    result = await result
 
-        return handler
+            except DBusError as e:
+                if msg.message_type != MessageType.METHOD_CALL:
+                    raise
+                send_reply(e._as_message(msg))
 
-    def _message_reader(self):
-        try:
+            except Exception as e:
+                if msg.message_type != MessageType.METHOD_CALL:
+                    raise
+                send_reply(
+                    Message.new_error(
+                        msg, ErrorType.SERVICE_ERROR,
+                        f'An internal error occurred: {e}.\n{traceback.format_exc()}'))
+            else:
+                body, fds = ServiceInterface._fn_result_to_body(
+                    result, signature_tree=method.out_signature_tree)
+                send_reply(Message.new_method_return(msg, method.out_signature, body, fds))
+
+        def _handler(msg, send_reply):
+            self._tg.spawn(handler, msg, send_reply)
+
+        return _handler
+
+    async def _message_reader(self, *, task_status):
+        unmarshaller = Unmarshaller()
+        sock = self._sock.extra(anyio.abc.SocketAttribute.raw_socket)
+
+        with anyio.open_cancel_scope() as sc:
+            task_status.started(sc)
             while True:
-                if self._unmarshaller.unmarshall():
-                    self._on_message(self._unmarshaller.message)
-                    self._unmarshaller = self._create_unmarshaller()
+                # data = await self._sock.receive()
+                await anyio.wait_socket_readable(sock.fileno())
+                data,aux,*_ = sock.recvmsg(8192,4096)
+                if not data:
+                    raise anyio.EndOfStream
+                unmarshaller.feed(data,aux)
+
+                for msg in unmarshaller:
+                    self._on_message(msg)
+
+    async def _message_writer(self, *, task_status):
+        sock = self._sock.extra(anyio.abc.SocketAttribute.raw_socket)
+        with anyio.open_cancel_scope() as sc:
+            task_status.started(sc)
+
+            async for msg in self._write_r:
+                buf, unix_fds, fut = msg
+                if unix_fds and self._negotiate_unix_fd:
+                    ancdata = [(socket.SOL_SOCKET, socket.SCM_RIGHTS,
+                                array.array("i", unix_fds))]
+
+                    await anyio.wait_socket_writable(sock.fileno())
+                    sock.sendmsg([buf], ancdata)
+                    self.unix_fds = None
                 else:
-                    break
-        except Exception as e:
-            self._finalize(e)
+                    await self._sock.send(buf)
+                fut.set(None)
+
+    def buffer_message(self, msg: Message, future=None):
+        self._write.send_nowait(
+            (msg._marshall(negotiate_unix_fd=self._negotiate_unix_fd), copy(msg.unix_fds), future))
+
+    def _schedule_write(self, msg: Message = None, future=None):
+        if msg is not None:
+            self.buffer_message(msg, future)
 
     async def _auth_readline(self):
         buf = b''
         while buf[-2:] != b'\r\n':
-            buf += await self._loop.sock_recv(self._sock, 2)
+            buf += await self._sock.receive()
         return buf[:-2].decode()
 
     async def _authenticate(self):
-        await self._loop.sock_sendall(self._sock, b'\0')
+        await self._sock.send(b'\0')
 
         first_line = self._auth._authentication_start(negotiate_unix_fd=self._negotiate_unix_fd)
 
         if first_line is not None:
-            if type(first_line) is not str:
-                raise AuthError('authenticator gave response not type str')
-            await self._loop.sock_sendall(self._sock, Authenticator._format_line(first_line))
+            if not isinstance(first_line, str):
+                raise AuthError('authenticator response is %r not str' % (first_line))
+            await self._sock.send(Authenticator._format_line(first_line))
 
         while True:
             response = self._auth._receive_line(await self._auth_readline())
             if response is not None:
-                await self._loop.sock_sendall(self._sock, Authenticator._format_line(response))
-                self._stream.flush()
+                await self._sock.send(Authenticator._format_line(response))
             if response == 'BEGIN':
                 break
 
-    def _create_unmarshaller(self):
-        sock = None
-        if self._negotiate_unix_fd:
-            sock = self._sock
-        return Unmarshaller(self._stream, sock)
-
     def _finalize(self, err=None):
-        try:
-            self._loop.remove_reader(self._fd)
-        except Exception:
-            logging.warning('could not remove message reader', exc_info=True)
-        try:
-            self._loop.remove_writer(self._fd)
-        except Exception:
-            logging.warning('could not remove message writer', exc_info=True)
+        if self._reader is not None:
+            self._reader.cancel()
+        if self._writer is not None:
+            self._writer.cancel()
+        if self._tg is not None:
+            self._tg.cancel_scope.cancel()
+        self._write = None
 
         super()._finalize(err)
 
-        if self._disconnect_future.done():
+        if self._disconnect_future is True or self._disconnect_future.is_set():
             return
 
         if err and not self._user_disconnect:
-            _future_set_exception(self._disconnect_future, err)
+            self._disconnect_future.set_error(err)
         else:
-            _future_set_result(self._disconnect_future, None)
+            self._disconnect_future.set(None)

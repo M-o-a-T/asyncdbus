@@ -1,12 +1,12 @@
-from dbus_next.aio import MessageBus
+from dbus_next.aio import MessageBus, ValueEvent
 from dbus_next import Message, MessageType, MessageFlag
 
 import pytest
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_standard_interfaces():
-    bus = await MessageBus().connect()
+  async with MessageBus().connect() as bus:
     msg = Message(destination='org.freedesktop.DBus',
                   path='/org/freedesktop/DBus',
                   interface='org.freedesktop.DBus',
@@ -40,10 +40,10 @@ async def test_standard_interfaces():
     assert type(reply.body[0]) is str
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_sending_messages_between_buses():
-    bus1 = await MessageBus().connect()
-    bus2 = await MessageBus().connect()
+  async with MessageBus().connect() as bus1, \
+          MessageBus().connect() as bus2:
 
     msg = Message(destination=bus1.unique_name,
                   path='/org/test/path',
@@ -100,10 +100,10 @@ async def test_sending_messages_between_buses():
     assert reply is None
 
 
-@pytest.mark.asyncio
-async def test_sending_signals_between_buses(event_loop):
-    bus1 = await MessageBus().connect()
-    bus2 = await MessageBus().connect()
+@pytest.mark.anyio
+async def test_sending_signals_between_buses():
+  async with MessageBus().connect() as bus1, \
+          MessageBus().connect() as bus2:
 
     add_match_msg = Message(destination='org.freedesktop.DBus',
                             path='/org/freedesktop/DBus',
@@ -115,7 +115,7 @@ async def test_sending_signals_between_buses(event_loop):
     await bus1.call(add_match_msg)
 
     async def wait_for_message():
-        future = event_loop.create_future()
+        future = ValueEvent()
 
         def message_handler(signal):
             if signal.sender == bus2.unique_name:
