@@ -16,8 +16,14 @@ import os
 import sys
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__) + '/..'))
 
-from dbus_next.__version__ import __title__, __author__, __version__, __copyright__
-_project_slug = __title__.replace('_', '-')
+_project_slug = asyncdbus
+__title__ = 'dbus_next'
+__description__ = 'A zero-dependency async DBus library'
+__url__ = 'https://github.com/M-o-a-T/asyncdbus'
+__author__ = 'Matthias Urlichs'
+__author_email__ = 'matthias@urlichs.de'
+__license__ = 'MIT'
+__copyright__ = 'Copyright 2019 Tony Crisci, 2021 Matthias Urlichs'
 
 # -- Project information -----------------------------------------------------
 
@@ -26,9 +32,9 @@ copyright = __copyright__
 author = __author__
 
 # The short X.Y version
-version = __version__
+version = '0.1.1'
 # The full version, including alpha/beta/rc tags
-release = __version__
+release = '0.1.1'
 
 # -- General configuration ---------------------------------------------------
 

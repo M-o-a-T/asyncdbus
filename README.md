@@ -1,3 +1,15 @@
+# asyncdbus
+
+This is a fork of python-dbus-next. It uses anyio under the hood, thus is
+compatible with Trio as well as asyncio.
+
+Support for GLib has been removed. If you need that, use Trio in guest
+mode.
+
+This library is available on PyPi as [asyncdbus](https://pypi.org/project/asyncdbus/).
+
+The rest of this document is from dbus-next and has not been modified.
+
 # python-dbus-next
 
 The next great DBus library for Python.
