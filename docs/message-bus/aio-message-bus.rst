@@ -1,7 +1,7 @@
 aio.MessageBus
 ==============
 
-.. autoclass:: dbus_next.aio.MessageBus
+.. autoclass:: asyncdbus.aio.MessageBus
     :members:
     :inherited-members:
     :show-inheritance:

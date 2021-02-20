@@ -1,5 +1,5 @@
-from dbus_next.aio import MessageBus, ValueEvent
-from dbus_next import Message, MessageType, MessageFlag
+from asyncdbus.aio import MessageBus, ValueEvent
+from asyncdbus import Message, MessageType, MessageFlag
 
 import pytest
 

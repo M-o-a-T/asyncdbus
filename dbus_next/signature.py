@@ -415,4 +415,4 @@ class Variant:
             return super().__eq__(other)
 
     def __repr__(self):
-        return "<dbus_next.signature.Variant ('%s', %s)>" % (self.type.signature, self.value)
+        return "<asyncdbus.signature.Variant ('%s', %s)>" % (self.type.signature, self.value)

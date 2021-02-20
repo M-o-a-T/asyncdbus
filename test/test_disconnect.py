@@ -1,5 +1,5 @@
-from dbus_next.aio import MessageBus
-from dbus_next import Message
+from asyncdbus.aio import MessageBus
+from asyncdbus import Message
 
 import os
 import pytest

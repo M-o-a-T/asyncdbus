@@ -1,5 +1,5 @@
-from dbus_next import SignatureTree, SignatureBodyMismatchError, Variant
-from dbus_next._private.util import signature_contains_type
+from asyncdbus import SignatureTree, SignatureBodyMismatchError, Variant
+from asyncdbus._private.util import signature_contains_type
 
 import pytest
 

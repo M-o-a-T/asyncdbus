@@ -1,5 +1,5 @@
-from dbus_next._private.unmarshaller import Unmarshaller
-from dbus_next import Message, Variant, SignatureTree
+from asyncdbus._private.unmarshaller import Unmarshaller
+from asyncdbus import Message, Variant, SignatureTree
 
 import json
 import os

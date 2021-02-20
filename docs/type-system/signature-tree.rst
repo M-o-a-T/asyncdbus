@@ -1,7 +1,7 @@
 SignatureTree
 =============
 
-.. autoclass:: dbus_next.SignatureTree
+.. autoclass:: asyncdbus.SignatureTree
     :members:
     :undoc-members:
 

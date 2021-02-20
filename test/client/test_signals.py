@@ -1,8 +1,8 @@
-from dbus_next.service import ServiceInterface, signal
-from dbus_next.aio import MessageBus
-from dbus_next import Message
-from dbus_next.introspection import Node
-from dbus_next.constants import RequestNameReply
+from asyncdbus.service import ServiceInterface, signal
+from asyncdbus.aio import MessageBus
+from asyncdbus import Message
+from asyncdbus.introspection import Node
+from asyncdbus.constants import RequestNameReply
 
 import pytest
 

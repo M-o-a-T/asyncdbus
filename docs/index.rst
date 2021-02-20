@@ -1,7 +1,7 @@
-Python DBus-Next Documentation
+Python AsyncDBus Documentation
 ==============================
 
-.. module:: dbus_next
+.. module:: asyncdbus
 
 .. toctree::
    :maxdepth: 3
@@ -18,6 +18,20 @@ Python DBus-Next Documentation
    errors
    authentication
 
+AsyncDbus
++++++++++
+
+AsyncDBus is an anyio-based library for accessing DBus.
+
+It is a fork of `dbus-next <https://pypi.org/project/dbus-next/>`_ which
+is based on AnyIO, i.e. it can be used from either asyncio or trio.
+
+GLib support has been removed. If you need to run async code under
+Glib/GTK, use Trio's guest mode. If you don't need to use async code, 
+use `dbus-next`_.
+
+The rest of the documentation has been kept mostly intact.
+
 Overview
 ++++++++
 
@@ -29,8 +43,8 @@ Desktop users can use this library to create their own scripts and utilities to 
 
 While other libraries for DBus exist for Python, this library offers the following improvements:
 
-- Zero dependencies and pure Python 3.
-- Support for multiple main loop backends including anyio and the GLib main loop.
+- Zero dependencies (except for AnyIO) and pure Python 3.
+- Support for multiple main loop backends.
 - Nonblocking IO suitable for GUI development.
 - Target the latest language features of Python for beautiful services and clients.
 - Complete implementation of the DBus type system without ever guessing types.
@@ -46,21 +60,21 @@ The library offers three core interfaces:
 Installation
 ++++++++++++
 
-This library is available on PyPi as `dbus-next <https://pypi.org/project/dbus-next/>`_.
+This library is available on PyPi as `asyncdbus <https://pypi.org/project/asyncdbus/>`_.
 
 .. code-block:: bash
 
-    pip3 install dbus-next
+    pip3 install asyncdbus
 
 Contributing
 ++++++++++++
 
-Development for this library happens on `Github <https://github.com/altdesktop/python-dbus-next>`_. Report bugs or request features there. Contributions are welcome.
+Development for this library happens on `Github <https://github.com/python-trio/asyncdbus>`_. Report bugs or request features there. Contributions are welcome.
 
 License
 ++++++++
 
-This library is available under an `MIT License <https://github.com/altdesktop/python-dbus-next/blob/master/LICENSE>`_.
+This library is available under an `MIT License <https://github.com/python-trio/asyncdbus/blob/master/LICENSE>`_.
 
 © 2019, Tony Crisci
 

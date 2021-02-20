@@ -1,4 +1,4 @@
-from dbus_next import introspection as intr, ArgDirection, PropertyAccess, SignatureType
+from asyncdbus import introspection as intr, ArgDirection, PropertyAccess, SignatureType
 
 import os
 

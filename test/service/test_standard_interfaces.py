@@ -1,8 +1,8 @@
-from dbus_next.service import ServiceInterface, dbus_property, PropertyAccess
-from dbus_next.signature import Variant
-from dbus_next.aio import MessageBus
-from dbus_next import Message, MessageType, introspection as intr
-from dbus_next.constants import ErrorType
+from asyncdbus.service import ServiceInterface, dbus_property, PropertyAccess
+from asyncdbus.signature import Variant
+from asyncdbus.aio import MessageBus
+from asyncdbus import Message, MessageType, introspection as intr
+from asyncdbus.constants import ErrorType
 
 import pytest
 

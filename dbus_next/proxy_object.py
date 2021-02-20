@@ -34,9 +34,9 @@ class BaseProxyInterface:
     :ivar path: The object path exported on the client that owns the bus name.
     :vartype path: str
     :ivar introspection: Parsed introspection data for the proxy interface.
-    :vartype introspection: :class:`Node <dbus_next.introspection.Interface>`
+    :vartype introspection: :class:`Node <asyncdbus.introspection.Interface>`
     :ivar bus: The message bus this proxy interface is connected to.
-    :vartype bus: :class:`BaseMessageBus <dbus_next.message_bus.BaseMessageBus>`
+    :vartype bus: :class:`BaseMessageBus <asyncdbus.message_bus.BaseMessageBus>`
     """
     def __init__(self, bus_name, path, introspection, bus):
 
@@ -138,7 +138,7 @@ class BaseProxyObject:
 
     Implementations of this class are not meant to be constructed directly. Use
     :func:`BaseMessageBus.get_proxy_object()
-    <dbus_next.message_bus.BaseMessageBus.get_proxy_object>` to get a proxy
+    <asyncdbus.message_bus.BaseMessageBus.get_proxy_object>` to get a proxy
     object. Each message bus implementation provides its own proxy object
     implementation that will be returned by that method.
 
@@ -154,18 +154,18 @@ class BaseProxyObject:
     :ivar path: The object path exported on the client that owns the bus name.
     :vartype path: str
     :ivar introspection: Parsed introspection data for the proxy object.
-    :vartype introspection: :class:`Node <dbus_next.introspection.Node>`
+    :vartype introspection: :class:`Node <asyncdbus.introspection.Node>`
     :ivar bus: The message bus this proxy object is connected to.
-    :vartype bus: :class:`BaseMessageBus <dbus_next.message_bus.BaseMessageBus>`
+    :vartype bus: :class:`BaseMessageBus <asyncdbus.message_bus.BaseMessageBus>`
     :ivar ~.ProxyInterface: The proxy interface class this proxy object uses.
-    :vartype ~.ProxyInterface: Type[:class:`BaseProxyInterface <dbus_next.proxy_object.BaseProxyObject>`]
+    :vartype ~.ProxyInterface: Type[:class:`BaseProxyInterface <asyncdbus.proxy_object.BaseProxyObject>`]
     :ivar child_paths: A list of absolute object paths of the children of this object.
     :vartype child_paths: list(str)
 
     :raises:
-        - :class:`InvalidBusNameError <dbus_next.InvalidBusNameError>` - If the given bus name is not valid.
-        - :class:`InvalidObjectPathError <dbus_next.InvalidObjectPathError>` - If the given object path is not valid.
-        - :class:`InvalidIntrospectionError <dbus_next.InvalidIntrospectionError>` - If the introspection data for the node is not valid.
+        - :class:`InvalidBusNameError <asyncdbus.InvalidBusNameError>` - If the given bus name is not valid.
+        - :class:`InvalidObjectPathError <asyncdbus.InvalidObjectPathError>` - If the given object path is not valid.
+        - :class:`InvalidIntrospectionError <asyncdbus.InvalidIntrospectionError>` - If the introspection data for the node is not valid.
     """
     def __init__(self, bus_name: str, path: str, introspection: Union[intr.Node, str, ET.Element],
                  bus: 'message_bus.BaseMessageBus', ProxyInterface: Type[BaseProxyInterface]):
@@ -205,7 +205,7 @@ class BaseProxyObject:
         :type name: str
 
         :raises:
-            - :class:`InterfaceNotFoundError <dbus_next.InterfaceNotFoundError>` - If there is no interface by this name exported on the bus.
+            - :class:`InterfaceNotFoundError <asyncdbus.InterfaceNotFoundError>` - If there is no interface by this name exported on the bus.
         """
         if name in self._interfaces:
             return self._interfaces[name]

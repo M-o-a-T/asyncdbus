@@ -67,7 +67,7 @@ def method(name: str = None, disabled: bool = False):
     dbus-next type system. If multiple parameters are returned, they must be
     contained within a :class:`list`.
 
-    The decorated method may raise a :class:`DBusError <dbus_next.DBusError>`
+    The decorated method may raise a :class:`DBusError <asyncdbus.DBusError>`
     to return an error to the client.
 
     :param name: The member name that DBus clients will use to call this method. Defaults to the name of the class method.
@@ -266,7 +266,7 @@ def dbus_property(access: PropertyAccess = PropertyAccess.READWRITE,
 
     The parameters of the getter and the setter must conform to the dbus-next
     type system. The getter or the setter may raise a :class:`DBusError
-    <dbus_next.DBusError>` to return an error to the client.
+    <asyncdbus.DBusError>` to return an error to the client.
 
     :param name: The name that DBus clients will use to interact with this
         property on the bus.
@@ -306,12 +306,12 @@ class ServiceInterface:
     """An abstract class that can be extended by the user to define DBus services.
 
     Instances of :class:`ServiceInterface` can be exported on a path of the bus
-    with the :class:`export <dbus_next.message_bus.BaseMessageBus.export>`
-    method of a :class:`MessageBus <dbus_next.message_bus.BaseMessageBus>`.
+    with the :class:`export <asyncdbus.message_bus.BaseMessageBus.export>`
+    method of a :class:`MessageBus <asyncdbus.message_bus.BaseMessageBus>`.
 
-    Use the :func:`@method <dbus_next.service.method>`, :func:`@dbus_property
-    <dbus_next.service.dbus_property>`, and :func:`@signal
-    <dbus_next.service.signal>` decorators to mark class methods as DBus
+    Use the :func:`@method <asyncdbus.service.method>`, :func:`@dbus_property
+    <asyncdbus.service.dbus_property>`, and :func:`@signal
+    <asyncdbus.service.signal>` decorators to mark class methods as DBus
     methods, properties, and signals respectively.
 
     :ivar name: The name of this interface as it appears to clients. Must be a
@@ -387,7 +387,7 @@ class ServiceInterface:
         This might be useful for creating clients for the interface or examining the introspection output of an interface.
 
         :returns: The introspection data for the interface.
-        :rtype: :class:`dbus_next.introspection.Interface`
+        :rtype: :class:`asyncdbus.introspection.Interface`
         """
         # TODO cannot be overridden by a dbus member
         return intr.Interface(self.name,

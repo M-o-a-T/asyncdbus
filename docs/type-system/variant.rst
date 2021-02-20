@@ -1,6 +1,6 @@
 Variant
 =======
 
-.. autoclass:: dbus_next.Variant
+.. autoclass:: asyncdbus.Variant
     :members:
     :undoc-members:

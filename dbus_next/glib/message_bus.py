@@ -135,18 +135,18 @@ class MessageBus(BaseMessageBus):
     library. It sets up a connection to the DBus daemon and exposes an
     interface to send and receive messages and expose services.
 
-    You must call :func:`connect() <dbus_next.glib.MessageBus.connect>` or
-    :func:`connect_sync() <dbus_next.glib.MessageBus.connect_sync>` before
+    You must call :func:`connect() <asyncdbus.glib.MessageBus.connect>` or
+    :func:`connect_sync() <asyncdbus.glib.MessageBus.connect_sync>` before
     using this message bus.
 
     :param bus_type: The type of bus to connect to. Affects the search path for
         the bus address.
-    :type bus_type: :class:`BusType <dbus_next.BusType>`
+    :type bus_type: :class:`BusType <asyncdbus.BusType>`
     :param bus_address: A specific bus address to connect to. Should not be
         used under normal circumstances.
     :param auth: The authenticator to use, defaults to an instance of
-        :class:`AuthExternal <dbus_next.auth.AuthExternal>`.
-    :type auth: :class:`Authenticator <dbus_next.auth.Authenticator>`
+        :class:`AuthExternal <asyncdbus.auth.AuthExternal>`.
+    :type auth: :class:`Authenticator <asyncdbus.auth.Authenticator>`
 
     :ivar connected: True if this message bus is expected to be able to send
         and receive messages.
@@ -185,7 +185,7 @@ class MessageBus(BaseMessageBus):
 
         :param connect_notify: A callback that will be called with this message
             bus. May return an :class:`Exception` on connection errors or
-            :class:`AuthError <dbus_next.AuthError>` on authorization errors.
+            :class:`AuthError <asyncdbus.AuthError>` on authorization errors.
         :type callback: :class:`Callable`
         """
         self._setup_socket()
@@ -236,10 +236,10 @@ class MessageBus(BaseMessageBus):
         message bus can be used.
 
         :returns: This message bus for convenience.
-        :rtype: :class:`MessageBus <dbus_next.glib.MessageBus>`
+        :rtype: :class:`MessageBus <asyncdbus.glib.MessageBus>`
 
         :raises:
-            - :class:`AuthError <dbus_next.AuthError>` - If authorization to \
+            - :class:`AuthError <asyncdbus.AuthError>` - If authorization to \
               the DBus daemon failed.
             - :class:`Exception` - If there was a connection error.
         """
@@ -268,7 +268,7 @@ class MessageBus(BaseMessageBus):
         daemon.
 
         :param msg: The method call message to send.
-        :type msg: :class:`Message <dbus_next.Message>`
+        :type msg: :class:`Message <asyncdbus.Message>`
         :param reply_notify: A callback that will be called with the reply to
             this message. May return an :class:`Exception` on connection errors.
         :type reply_notify: Callable
@@ -280,15 +280,15 @@ class MessageBus(BaseMessageBus):
         daemon.
 
         :param msg: The method call message to send.
-        :type msg: :class:`Message <dbus_next.Message>`
+        :type msg: :class:`Message <asyncdbus.Message>`
 
         :returns: A message in reply to the message sent. If the message does
             not expect a reply based on the message flags or type, returns
             ``None`` immediately.
-        :rtype: :class:`Message <dbus_next.Message>`
+        :rtype: :class:`Message <asyncdbus.Message>`
 
         :raises:
-            - :class:`DBusError <dbus_next.DBusError>` - If the service threw \
+            - :class:`DBusError <asyncdbus.DBusError>` - If the service threw \
                   an error for the method call or returned an invalid result.
             - :class:`Exception` - If a connection error occurred.
         """
@@ -334,14 +334,14 @@ class MessageBus(BaseMessageBus):
         :type path: str
 
         :returns: The introspection data for the name at the path.
-        :rtype: :class:`Node <dbus_next.introspection.Node>`
+        :rtype: :class:`Node <asyncdbus.introspection.Node>`
 
         :raises:
-            - :class:`InvalidObjectPathError <dbus_next.InvalidObjectPathError>` \
+            - :class:`InvalidObjectPathError <asyncdbus.InvalidObjectPathError>` \
                     - If the given object path is not valid.
-            - :class:`InvalidBusNameError <dbus_next.InvalidBusNameError>` - If \
+            - :class:`InvalidBusNameError <asyncdbus.InvalidBusNameError>` - If \
                   the given bus name is not valid.
-            - :class:`DBusError <dbus_next.DBusError>` - If the service threw \
+            - :class:`DBusError <asyncdbus.DBusError>` - If the service threw \
                   an error for the method call or returned an invalid result.
             - :class:`Exception` - If a connection error occurred.
         """
@@ -372,15 +372,15 @@ class MessageBus(BaseMessageBus):
         :param name: The name to request.
         :type name: str
         :param flags: Name flags that affect the behavior of the name request.
-        :type flags: :class:`NameFlag <dbus_next.NameFlag>`
+        :type flags: :class:`NameFlag <asyncdbus.NameFlag>`
 
         :returns: The reply to the name request.
-        :rtype: :class:`RequestNameReply <dbus_next.RequestNameReply>`
+        :rtype: :class:`RequestNameReply <asyncdbus.RequestNameReply>`
 
         :raises:
-            - :class:`InvalidBusNameError <dbus_next.InvalidBusNameError>` - If \
+            - :class:`InvalidBusNameError <asyncdbus.InvalidBusNameError>` - If \
                   the given bus name is not valid.
-            - :class:`DBusError <dbus_next.DBusError>` - If the service threw \
+            - :class:`DBusError <asyncdbus.DBusError>` - If the service threw \
                   an error for the method call or returned an invalid result.
             - :class:`Exception` - If a connection error occurred.
         """
@@ -412,12 +412,12 @@ class MessageBus(BaseMessageBus):
         :type name: str
 
         :returns: The reply to the release request.
-        :rtype: :class:`ReleaseNameReply <dbus_next.ReleaseNameReply>`
+        :rtype: :class:`ReleaseNameReply <asyncdbus.ReleaseNameReply>`
 
         :raises:
-            - :class:`InvalidBusNameError <dbus_next.InvalidBusNameError>` - If \
+            - :class:`InvalidBusNameError <asyncdbus.InvalidBusNameError>` - If \
                   the given bus name is not valid.
-            - :class:`DBusError <dbus_next.DBusError>` - If the service threw \
+            - :class:`DBusError <asyncdbus.DBusError>` - If the service threw \
                   an error for the method call or returned an invalid result.
             - :class:`Exception` - If a connection error occurred.
         """

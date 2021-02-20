@@ -1,7 +1,7 @@
-from dbus_next.message import MessageFlag
-from dbus_next.service import ServiceInterface, method
-import dbus_next.introspection as intr
-from dbus_next import aio, glib, DBusError
+from asyncdbus.message import MessageFlag
+from asyncdbus.service import ServiceInterface, method
+import asyncdbus.introspection as intr
+from asyncdbus import aio, glib, DBusError
 from test.util import check_gi_repository, skip_reason_no_gi
 
 import pytest
