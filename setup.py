@@ -4,11 +4,11 @@
 import io
 import os
 
-from setuptools import setup, find_packages
+from setuptools import setup
 
 # Package meta-data.
-DESCRIPTION = 'A zero-dependency DBus library for Python with async support'
-REQUIRES_PYTHON = '>=3.6.0'
+DESCRIPTION = 'A zero-dependency async DBus library'
+REQUIRES_PYTHON = '>=3.7.0'
 
 # What packages are required for this module to be executed?
 REQUIRED = []
@@ -23,24 +23,29 @@ EXTRAS = {}
 
 here = os.path.abspath(os.path.dirname(__file__))
 
-about = {}
-with open(os.path.join(here, 'dbus_next', '__version__.py')) as f:
-    exec(f.read(), about)
+__title__ = 'dbus_next'
+__description__ = 'A zero-dependency async DBus library'
+__url__ = 'https://github.com/M-o-a-T/asyncdbus'
+__author__ = 'Matthias Urlichs'
+__author_email__ = 'matthias@urlichs.de'
+__license__ = 'MIT'
+__copyright__ = 'Copyright 2019 Tony Crisci, 2021 Matthias Urlichs'
 
 with io.open(os.path.join(here, 'README.md'), encoding='utf-8') as f:
     long_description = '\n' + f.read()
 
 setup(
-    name=about['__title__'],
-    version=about['__version__'],
+    name=__title__,
+    use_scm_version={"version_scheme": "guess-next-dev", "local_scheme": "dirty-tag"},
+    setup_requires=["setuptools_scm"],
     description=DESCRIPTION,
     long_description=long_description,
     long_description_content_type='text/markdown',
-    author=about['__author__'],
-    author_email=about['__author_email__'],
+    author=__author__,
+    author_email=__author_email__,
     python_requires=REQUIRES_PYTHON,
-    url=about['__url__'],
-    packages=find_packages(exclude=['test', '*.test', '*.test.*', 'test.*']),
+    url=__url__,
+    packages=["asyncdbus"],
     install_requires=REQUIRED,
     extras_require=EXTRAS,
     include_package_data=True,
@@ -57,8 +62,9 @@ setup(
         'License :: OSI Approved :: MIT License',
         'Programming Language :: Python',
         'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.6',
         'Programming Language :: Python :: 3.7',
+        'Programming Language :: Python :: 3.8',
+        'Programming Language :: Python :: 3.9',
         'Programming Language :: Python :: Implementation :: CPython',
         'Programming Language :: Python :: Implementation :: PyPy',
         'Typing :: Typed'
