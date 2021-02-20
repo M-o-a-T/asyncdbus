@@ -955,7 +955,7 @@ class BaseMessageBus:
         def remove_match_notify(msg, err):
             if err:
                 logging.error(f'remove match request failed. match="{match_rule}", {err}')
-            if msg.message_type == MessageType.ERROR:
+            elif msg.message_type == MessageType.ERROR:
                 logging.error(f'remove match request failed. match="{match_rule}", {msg.body[0]}')
 
         self._call(
