@@ -461,7 +461,7 @@ class MessageBus(BaseMessageBus):
 
                     await anyio.wait_socket_writable(sock.fileno())
                     sock.sendmsg([buf], ancdata)
-                    self.unix_fds = None
+                    unix_fds = None
                 else:
                     await self._sock.send(buf)
                 fut.set(None)
