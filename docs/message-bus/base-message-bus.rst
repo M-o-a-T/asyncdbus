@@ -1,5 +1,5 @@
 BaseMessageBus
 ==============
 
-.. autoclass:: dbus_next.message_bus.BaseMessageBus
+.. autoclass:: asyncdbus.message_bus.BaseMessageBus
     :members:

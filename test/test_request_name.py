@@ -1,4 +1,4 @@
-from dbus_next import aio, glib, Message, MessageType, NameFlag, RequestNameReply, ReleaseNameReply
+from asyncdbus import aio, glib, Message, MessageType, NameFlag, RequestNameReply, ReleaseNameReply
 from test.util import check_gi_repository, skip_reason_no_gi
 
 import pytest

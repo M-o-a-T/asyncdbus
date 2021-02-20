@@ -1,5 +1,5 @@
-from dbus_next.glib import MessageBus
-from dbus_next import Message, MessageType, MessageFlag
+from asyncdbus.glib import MessageBus
+from asyncdbus import Message, MessageType, MessageFlag
 from test.util import check_gi_repository, skip_reason_no_gi
 
 import pytest

@@ -1,7 +1,7 @@
 .PHONY: lint check format test docker-test clean publish docs livedocs all
 .DEFAULT_GOAL := all
 
-source_dirs = dbus_next test examples
+source_dirs = asyncdbus test examples
 
 lint:
 	python3 -m flake8 $(source_dirs)
@@ -15,7 +15,7 @@ format:
 test:
 	for py in python3.6 python3.7 python3.9 python3.8 ; do \
 		if hash $$py; then \
-			dbus-run-session $$py -m pytest -sv --cov=dbus_next || exit 1 ; \
+			dbus-run-session $$py -m pytest -sv --cov=asyncdbus || exit 1 ; \
 		fi \
 	done \
 
@@ -24,7 +24,7 @@ docker-test:
 	docker run -it dbus-next-test
 
 clean:
-	rm -rf dist dbus_next.egg-info build docs/_build
+	rm -rf dist asyncdbus.egg-info build docs/_build
 	rm -rf `find -type d -name __pycache__`
 
 publish:
@@ -35,6 +35,6 @@ docs:
 	sphinx-build docs docs/_build/html
 
 livedocs:
-	sphinx-autobuild docs docs/_build/html --watch dbus_next
+	sphinx-autobuild docs docs/_build/html --watch asyncdbus
 
 all: format lint test

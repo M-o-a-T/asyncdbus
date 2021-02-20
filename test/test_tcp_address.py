@@ -1,6 +1,6 @@
-from dbus_next.aio import MessageBus
-from dbus_next import Message
-from dbus_next._private.address import parse_address
+from asyncdbus.aio import MessageBus
+from asyncdbus import Message
+from asyncdbus._private.address import parse_address
 
 import anyio
 import pytest

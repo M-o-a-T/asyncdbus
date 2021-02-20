@@ -1,5 +1,5 @@
-from dbus_next import aio, glib, Message, MessageType
-from dbus_next.service import ServiceInterface, method
+from asyncdbus import aio, glib, Message, MessageType
+from asyncdbus.service import ServiceInterface, method
 from test.util import check_gi_repository, skip_reason_no_gi
 
 import pytest

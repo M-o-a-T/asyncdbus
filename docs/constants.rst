@@ -2,38 +2,38 @@ Constants
 =========
 
 
-.. autoclass:: dbus_next.BusType
+.. autoclass:: asyncdbus.BusType
     :members:
     :undoc-members:
 
-.. autoclass:: dbus_next.MessageType
+.. autoclass:: asyncdbus.MessageType
     :members:
     :undoc-members:
 
-.. autoclass:: dbus_next.MessageFlag
+.. autoclass:: asyncdbus.MessageFlag
     :members:
     :undoc-members:
 
-.. autoclass:: dbus_next.NameFlag
+.. autoclass:: asyncdbus.NameFlag
     :members:
     :undoc-members:
 
-.. autoclass:: dbus_next.RequestNameReply
+.. autoclass:: asyncdbus.RequestNameReply
     :members:
     :undoc-members:
 
-.. autoclass:: dbus_next.ReleaseNameReply
+.. autoclass:: asyncdbus.ReleaseNameReply
     :members:
     :undoc-members:
 
-.. autoclass:: dbus_next.PropertyAccess
+.. autoclass:: asyncdbus.PropertyAccess
     :members:
     :undoc-members:
 
-.. autoclass:: dbus_next.ArgDirection
+.. autoclass:: asyncdbus.ArgDirection
     :members:
     :undoc-members:
 
-.. autoclass:: dbus_next.ErrorType
+.. autoclass:: asyncdbus.ErrorType
     :members:
     :undoc-members:

@@ -1,6 +1,6 @@
 Message
 =======
 
-.. autoclass:: dbus_next.Message
+.. autoclass:: asyncdbus.Message
     :members:
     :undoc-members:

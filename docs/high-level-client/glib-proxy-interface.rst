@@ -1,7 +1,7 @@
 glib.ProxyInterface
 ===================
 
-.. autoclass:: dbus_next.glib.ProxyInterface
+.. autoclass:: asyncdbus.glib.ProxyInterface
     :members:
     :undoc-members:
     :show-inheritance:

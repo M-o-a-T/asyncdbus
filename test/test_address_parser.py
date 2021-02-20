@@ -1,4 +1,4 @@
-from dbus_next._private.address import parse_address
+from asyncdbus._private.address import parse_address
 
 
 def test_valid_addresses():

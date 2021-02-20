@@ -1,2 +1,2 @@
-include README.md LICENSE CHANGELOG.md pytest.ini requirements.txt .flake8 .style.yapf Dockerfile dbus_next/py.typed
+include README.md LICENSE CHANGELOG.md pytest.ini requirements.txt .flake8 .style.yapf Dockerfile asyncdbus/py.typed
 recursive-include test *.py

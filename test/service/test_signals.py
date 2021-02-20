@@ -1,8 +1,8 @@
-from dbus_next.service import ServiceInterface, signal, SignalDisabledError, dbus_property
-from dbus_next.aio import MessageBus, ValueEvent
-from dbus_next import Message, MessageType
-from dbus_next.constants import PropertyAccess
-from dbus_next.signature import Variant
+from asyncdbus.service import ServiceInterface, signal, SignalDisabledError, dbus_property
+from asyncdbus.aio import MessageBus, ValueEvent
+from asyncdbus import Message, MessageType
+from asyncdbus.constants import PropertyAccess
+from asyncdbus.signature import Variant
 
 import pytest
 import anyio

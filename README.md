@@ -51,7 +51,7 @@ For more information, see the [overview for the high-level client](https://pytho
 This example connects to a media player and controls it with the [MPRIS](https://specifications.freedesktop.org/mpris-spec/latest/) DBus interface.
 
 ```python
-from dbus_next.aio import MessageBus
+from asyncdbus.aio import MessageBus
 
 import anyio
 
@@ -93,8 +93,8 @@ To define a service on the bus, use the `ServiceInterface` class and decorate cl
 For more information, see the [overview for the high-level service](https://python-dbus-next.readthedocs.io/en/latest/high-level-service/index.html).
 
 ```python
-from dbus_next.service import ServiceInterface, method, dbus_property, signal, Variant
-from dbus_next.aio MessageBus
+from asyncdbus.service import ServiceInterface, method, dbus_property, signal, Variant
+from asyncdbus.aio MessageBus
 
 import anyio
 
@@ -146,8 +146,8 @@ The low-level interface works with DBus messages directly.
 For more information, see the [overview for the low-level interface](https://python-dbus-next.readthedocs.io/en/latest/low-level-interface/index.html).
 
 ```python
-from dbus_next.message import Message, MessageType
-from dbus_next.aio import MessageBus
+from asyncdbus.message import Message, MessageType
+from asyncdbus.aio import MessageBus
 
 import anyio
 import json

@@ -1,8 +1,8 @@
 """This tests the ability to send and receive file descriptors in dbus messages"""
-from dbus_next.service import ServiceInterface, method, signal, dbus_property
-from dbus_next.signature import SignatureTree, Variant
-from dbus_next.aio import MessageBus, ValueEvent
-from dbus_next import Message, MessageType
+from asyncdbus.service import ServiceInterface, method, signal, dbus_property
+from asyncdbus.signature import SignatureTree, Variant
+from asyncdbus.aio import MessageBus, ValueEvent
+from asyncdbus import Message, MessageType
 import os
 import anyio
 import pytest
