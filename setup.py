@@ -23,7 +23,7 @@ EXTRAS = {}
 
 here = os.path.abspath(os.path.dirname(__file__))
 
-__title__ = 'dbus_next'
+__title__ = 'asyncdbus'
 __description__ = 'A zero-dependency async DBus library'
 __url__ = 'https://github.com/M-o-a-T/asyncdbus'
 __author__ = 'Matthias Urlichs'
