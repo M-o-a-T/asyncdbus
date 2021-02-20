@@ -61,7 +61,8 @@ async def test_tcp_connection_with_forwarding():
         iface = obj.get_interface('org.freedesktop.DBus.Peer')
         await iface.call_ping()
 
-        sock = bus._sock.extra(anyio.abc.SocketAttribute.raw_socket)
+        sock = bus._sock.extra(anyio.abc.SocketAttribute.raw_socket) \
+                if hasattr(bus._sock,'extra') else bus._sock
         assert sock.getpeername()[0] == host
         assert sock.getsockname()[0] == host
         assert sock.gettimeout() == 0

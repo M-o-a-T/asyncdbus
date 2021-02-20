@@ -4,6 +4,7 @@ from dbus_next import Message
 import os
 import pytest
 import anyio
+import errno
 
 
 @pytest.mark.anyio
@@ -25,7 +26,7 @@ async def test_bus_disconnect_before_reply():
 async def test_unexpected_disconnect():
     bus = MessageBus()
     assert not bus.connected
-    with pytest.raises(anyio.BrokenResourceError):
+    with pytest.raises((anyio.BrokenResourceError, OSError, anyio.ExceptionGroup)):
         async with bus.connect():
             assert bus.connected
 
@@ -37,7 +38,6 @@ async def test_unexpected_disconnect():
 
             os.close(bus._fd)
 
-            # The actual async call will cancel this scope
+            # The actual async call will ecancel this scope
             # and re-raise the error when leaving the context
             await ping
-            assert False, "Not called"

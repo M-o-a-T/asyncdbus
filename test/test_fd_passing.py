@@ -4,7 +4,7 @@ from dbus_next.signature import SignatureTree, Variant
 from dbus_next.aio import MessageBus, ValueEvent
 from dbus_next import Message, MessageType
 import os
-
+import anyio
 import pytest
 
 
@@ -258,6 +258,7 @@ async def test_sending_file_descriptor_with_proxy():
         proxy_interface.off_signal_fd(on_signal_fd)
 
     proxy_interface.on_signal_fd(on_signal_fd)
+    await anyio.sleep(0.1)  # TODO we have a timing problem here
     interface.SignalFd()
     fd = await fut
     assert_fds_equal(interface.get_last_fd(), fd)

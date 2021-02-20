@@ -143,7 +143,7 @@ class MessageBus(BaseMessageBus):
         self._tg.spawn(self._disconnect)
 
     async def _disconnect(self):
-        await self._sock.aclose()
+        self._sock.close()
 
 
     async def _setup_socket_aio(self):
@@ -160,7 +160,17 @@ class MessageBus(BaseMessageBus):
                     raise InvalidAddressError('got unix transport with unknown path specifier')
 
                 try:
-                    self._sock = await anyio.connect_unix(filename)
+                    sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM, 0)
+                    sock.setblocking(False)
+                    sock.connect(filename)
+                except (BlockingIOError, InterruptedError):
+                    await anyio.wait_socket_writable(sock)
+                    e = sock.getsockopt(socket.SOL_SOCKET, socket.SO_ERROR)
+                    if e:
+                        if err is None:
+                            err = OSError(err, f'Connect failed for {filename}')
+                    else:
+                        break
                 except Exception as e:
                     if err is None:
                         err = e
@@ -168,7 +178,7 @@ class MessageBus(BaseMessageBus):
                     break
 
             elif transport == 'tcp':
-                ip_addr = ''
+                ip_addr = '127.0.0.1'
                 ip_port = 0
 
                 if 'host' in options:
@@ -177,7 +187,16 @@ class MessageBus(BaseMessageBus):
                     ip_port = int(options['port'])
 
                 try:
-                    self._sock = await anyio.connect_tcp(ip_addr, ip_port)
+                    sock = socket.create_connection((ip_addr,ip_port))
+                    sock.setblocking(False)
+                except (BlockingIOError, InterruptedError):
+                    await anyio.wait_socket_writable(sock)
+                    e = sock.getsockopt(socket.SOL_SOCKET, socket.SO_ERROR)
+                    if e:
+                        if err is None:
+                            err = OSError(err, f'Connect failed for {filename}')
+                    else:
+                        break
                 except Exception as e:
                     if err is None:
                         err = e
@@ -190,7 +209,9 @@ class MessageBus(BaseMessageBus):
         if err:
             raise err
 
-        self._fd = self._sock.extra(anyio.abc.SocketAttribute.raw_socket).fileno()
+        self._sock = sock
+        self._fd = self._sock.fileno()
+
 
     @asynccontextmanager
     async def connect(self) -> 'MessageBus':
@@ -236,7 +257,8 @@ class MessageBus(BaseMessageBus):
                                     serial=self.next_serial())
 
                 self._method_return_handlers[hello_msg.serial] = on_hello
-                await self._sock.send(hello_msg._marshall())
+                await anyio.wait_socket_writable(self._sock)
+                self._sock.send(hello_msg._marshall())
 
                 await future
                 self._writer = await tg.start(self._message_writer)
@@ -433,14 +455,12 @@ class MessageBus(BaseMessageBus):
 
     async def _message_reader(self, *, task_status):
         unmarshaller = Unmarshaller()
-        sock = self._sock.extra(anyio.abc.SocketAttribute.raw_socket)
-
         with anyio.open_cancel_scope() as sc:
             task_status.started(sc)
             while True:
                 # data = await self._sock.receive()
-                await anyio.wait_socket_readable(sock.fileno())
-                data,aux,*_ = sock.recvmsg(8192,4096)
+                await anyio.wait_socket_readable(self._sock)
+                data,aux,*_ = self._sock.recvmsg(8192,4096)
                 if not data:
                     raise anyio.EndOfStream
                 unmarshaller.feed(data,aux)
@@ -449,21 +469,27 @@ class MessageBus(BaseMessageBus):
                     self._on_message(msg)
 
     async def _message_writer(self, *, task_status):
-        sock = self._sock.extra(anyio.abc.SocketAttribute.raw_socket)
         with anyio.open_cancel_scope() as sc:
             task_status.started(sc)
 
             async for msg in self._write_r:
                 buf, unix_fds, fut = msg
-                if unix_fds and self._negotiate_unix_fd:
-                    ancdata = [(socket.SOL_SOCKET, socket.SCM_RIGHTS,
-                                array.array("i", unix_fds))]
+                buf = memoryview(buf)
+                done = 0
+                while done < len(buf) or (unix_fds and self._negotiate_unix_fd):
+                    await anyio.wait_socket_writable(self._sock)
+                    if unix_fds and self._negotiate_unix_fd:
+                        ancdata = [(socket.SOL_SOCKET, socket.SCM_RIGHTS,
+                                    array.array("i", unix_fds))]
 
-                    await anyio.wait_socket_writable(sock.fileno())
-                    sock.sendmsg([buf], ancdata)
-                    unix_fds = None
-                else:
-                    await self._sock.send(buf)
+                        done2 = self._sock.sendmsg([buf[done:]], ancdata)
+                        unix_fds = None
+                    else:
+                        done2 = self._sock.send(buf[done:])
+                    if not done2:
+                        raise EOFError
+                    done += done2
+
                 fut.set(None)
 
     def buffer_message(self, msg: Message, future=None):
@@ -477,23 +503,32 @@ class MessageBus(BaseMessageBus):
     async def _auth_readline(self):
         buf = b''
         while buf[-2:] != b'\r\n':
-            buf += await self._sock.receive()
+            await anyio.wait_socket_readable(self._sock)
+            data = self._sock.recv(1024)
+            if not data:
+                raise EOFError
+            buf += data
         return buf[:-2].decode()
 
     async def _authenticate(self):
-        await self._sock.send(b'\0')
+        await anyio.wait_socket_writable(self._sock)
+        done = self._sock.send(b'\0')
+        if not done:
+            raise EOFError
 
         first_line = self._auth._authentication_start(negotiate_unix_fd=self._negotiate_unix_fd)
 
         if first_line is not None:
             if not isinstance(first_line, str):
                 raise AuthError('authenticator response is %r not str' % (first_line))
-            await self._sock.send(Authenticator._format_line(first_line))
+            await anyio.wait_socket_writable(self._sock)
+            done = self._sock.send(Authenticator._format_line(first_line))
 
         while True:
             response = self._auth._receive_line(await self._auth_readline())
             if response is not None:
-                await self._sock.send(Authenticator._format_line(response))
+                await anyio.wait_socket_writable(self._sock)
+                done = self._sock.send(Authenticator._format_line(response))
             if response == 'BEGIN':
                 break
 
