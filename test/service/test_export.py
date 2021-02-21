@@ -1,6 +1,5 @@
 from asyncdbus.service import ServiceInterface, method
-from asyncdbus.aio import MessageBus
-from asyncdbus import Message, MessageType, introspection as intr
+from asyncdbus import Message, MessageBus, MessageType, introspection as intr
 
 import pytest
 

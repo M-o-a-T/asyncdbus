@@ -1,4 +1,16 @@
-# Changelog
+# Changelog for asyncdbus
+
+## Version 0.3.x
+
+This version forks the library and converts it to anyio.
+
+* remove aio and glib subpackages
+* temporarily use ValueEvent instead of `asyncio.Future`
+* minimal surgery to get it all to work with what will become anyio 3
+* `MessageBus.connect()` is now an async context manager
+
+
+# Changelog for dbus-next
 
 ## Version 0.2.2
 

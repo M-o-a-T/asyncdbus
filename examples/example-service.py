@@ -3,9 +3,9 @@ import sys
 import os
 sys.path.append(os.path.abspath(os.path.dirname(__file__) + '/..'))
 
-from dbus_next.service import ServiceInterface, method, signal, dbus_property
-from dbus_next.aio.message_bus import MessageBus
-from dbus_next import Variant
+from asyncdbus.service import ServiceInterface, method, signal, dbus_property
+from asyncdbus.message_bus import MessageBus
+from asyncdbus import Variant
 
 import anyio
 
@@ -58,8 +58,7 @@ async def main():
         bus.export('/example/path', interface)
         await bus.request_name(name)
         print(f'service up on name: "{name}", path: "{path}", interface: "{interface_name}"')
-        await bus.wait_for_disconnect()
-        # not reached unless the dbus daemon is killed / disconnects us
+        await anyio.sleep(99999)
 
 
 anyio.run(main)

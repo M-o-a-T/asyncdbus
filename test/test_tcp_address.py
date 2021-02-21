@@ -1,5 +1,4 @@
-from asyncdbus.aio import MessageBus
-from asyncdbus import Message
+from asyncdbus import Message, MessageBus
 from asyncdbus._private.address import parse_address
 
 import anyio
@@ -27,7 +26,7 @@ async def test_tcp_connection_with_forwarding():
                         while True:
                             data = await tcp_sock.receive()
                             await unix_sock.send(data)
-                    except anyio.ClosedResourceError:
+                    except (anyio.ClosedResourceError,anyio.EndOfStream):
                         return
 
                 async def handle_write():
@@ -35,7 +34,7 @@ async def test_tcp_connection_with_forwarding():
                         while True:
                             data = await unix_sock.receive()
                             await tcp_sock.send(data)
-                    except anyio.ClosedResourceError:
+                    except (anyio.ClosedResourceError,anyio.EndOfStream):
                         return
 
                 tg.spawn(handle_read)

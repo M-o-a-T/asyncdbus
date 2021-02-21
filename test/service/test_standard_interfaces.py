@@ -1,7 +1,6 @@
 from asyncdbus.service import ServiceInterface, dbus_property, PropertyAccess
 from asyncdbus.signature import Variant
-from asyncdbus.aio import MessageBus
-from asyncdbus import Message, MessageType, introspection as intr
+from asyncdbus import Message, MessageBus, MessageType, introspection as intr
 from asyncdbus.constants import ErrorType
 
 import pytest

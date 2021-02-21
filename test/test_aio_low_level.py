@@ -1,5 +1,4 @@
-from asyncdbus.aio import MessageBus, ValueEvent
-from asyncdbus import Message, MessageType, MessageFlag
+from asyncdbus import Message, MessageType, MessageFlag, MessageBus, ValueEvent
 
 import pytest
 

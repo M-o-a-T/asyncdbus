@@ -1,5 +1,4 @@
-from asyncdbus.aio import MessageBus
-from asyncdbus import Message
+from asyncdbus import Message, MessageBus
 
 import os
 import pytest
@@ -15,11 +14,7 @@ async def test_bus_disconnect_before_reply():
   assert not bus.connected
   async with bus.connect():
     assert bus.connected
-
-    await bus.disconnect()
-    # This actually cancels the current scope.
-
-    assert False, "Not called"
+  assert not bus.connected
 
 
 @pytest.mark.anyio

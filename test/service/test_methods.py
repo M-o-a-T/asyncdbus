@@ -1,6 +1,5 @@
 from asyncdbus.service import ServiceInterface, method
-from asyncdbus.aio import MessageBus
-from asyncdbus import Message, MessageType, ErrorType, Variant, SignatureTree, DBusError, MessageFlag
+from asyncdbus import Message, MessageBus, MessageType, ErrorType, Variant, SignatureTree, DBusError, MessageFlag
 
 import pytest
 

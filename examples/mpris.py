@@ -3,7 +3,7 @@ import sys
 import os
 sys.path.append(os.path.abspath(os.path.dirname(__file__) + '/..'))
 
-from dbus_next.aio import MessageBus
+from asyncdbus import MessageBus
 
 import anyio
 
@@ -34,7 +34,7 @@ async def main():
 
         properties.on_properties_changed(on_properties_changed)
 
-        await bus.wait_for_disconnect()
+        await anyio.sleep(99999)
 
 
 anyio.run(main)

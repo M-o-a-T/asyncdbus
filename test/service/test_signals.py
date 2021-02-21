@@ -1,6 +1,5 @@
 from asyncdbus.service import ServiceInterface, signal, SignalDisabledError, dbus_property
-from asyncdbus.aio import MessageBus, ValueEvent
-from asyncdbus import Message, MessageType
+from asyncdbus import Message, MessageType, MessageBus, ValueEvent
 from asyncdbus.constants import PropertyAccess
 from asyncdbus.signature import Variant
 

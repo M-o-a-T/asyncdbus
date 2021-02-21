@@ -1,8 +1,7 @@
 """This tests the ability to send and receive file descriptors in dbus messages"""
 from asyncdbus.service import ServiceInterface, method, signal, dbus_property
 from asyncdbus.signature import SignatureTree, Variant
-from asyncdbus.aio import MessageBus, ValueEvent
-from asyncdbus import Message, MessageType
+from asyncdbus import Message, MessageType, MessageBus, ValueEvent
 import os
 import anyio
 import pytest
@@ -107,8 +106,6 @@ async def test_sending_file_descriptor_low_level():
 
     for fd in [fd_before, fd_after]:
         os.close(fd)
-    for bus in [bus1, bus2]:
-        bus.disconnect()
 
 
 @pytest.mark.anyio
@@ -207,9 +204,6 @@ async def test_high_level_service_fd_passing():
     interface.cleanup()
     os.close(reply.unix_fds[0])
 
-    for bus in [bus1, bus2]:
-        bus.disconnect()
-
 
 @pytest.mark.anyio
 async def test_sending_file_descriptor_with_proxy():
@@ -264,6 +258,7 @@ async def test_sending_file_descriptor_with_proxy():
     assert_fds_equal(interface.get_last_fd(), fd)
     interface.cleanup()
     os.close(fd)
+    pass # closing
 
 
 @pytest.mark.anyio

@@ -1,6 +1,5 @@
 from asyncdbus.service import ServiceInterface, dbus_property, method
-from asyncdbus.aio import MessageBus, ValueEvent
-from asyncdbus import Message, MessageType, PropertyAccess, ErrorType, Variant, DBusError
+from asyncdbus import Message, MessageBus, ValueEvent, MessageType, PropertyAccess, ErrorType, Variant, DBusError
 
 import pytest
 import anyio

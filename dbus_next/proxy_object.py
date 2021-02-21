@@ -1,10 +1,11 @@
 from .validators import assert_object_path_valid, assert_bus_name_valid
 from . import message_bus
 from .message import Message
-from .constants import MessageType, ErrorType
+from .constants import MessageType, ErrorType, MessageFlag
 from . import introspection as intr
 from .errors import DBusError, InterfaceNotFoundError
-from ._private.util import replace_idx_with_fds
+from ._private.util import replace_idx_with_fds, replace_fds_with_idx
+from .signature import Variant
 
 from typing import Type, Union, List
 import logging
@@ -13,11 +14,11 @@ import inspect
 import re
 
 
-class BaseProxyInterface:
-    """An abstract class representing a proxy to an interface exported on the bus by another client.
+class ProxyInterface:
+    """A class representing a proxy to an interface exported on the bus by another client.
 
     Implementations of this class are not meant to be constructed directly by
-    users. Use :func:`BaseProxyObject.get_interface` to get a proxy interface.
+    users. Use :func:`ProxyObject.get_interface` to get a proxy interface.
     Each message bus implementation provides its own proxy interface
     implementation that will be returned by that method.
 
@@ -29,6 +30,52 @@ class BaseProxyInterface:
     the documentation of the proxy interface implementation you use for more
     details.
 
+    A *method call* takes this form:    
+                        
+    .. code-block:: python3
+        
+        result = await interface.call_[METHOD](*args)
+                
+    Where ``METHOD`` is the name of the method converted to snake case.
+
+    DBus methods are exposed as coroutines that take arguments that correpond
+    to the *in args* of the interface method definition and return a ``result``
+    that corresponds to the *out arg*. If the method has more than one out arg,
+    they are returned within a :class:`list`.
+
+    To *listen to a signal* use this form:
+                
+    .. code-block:: python3   
+
+        interface.on_[SIGNAL](callback)
+                
+    To *stop listening to a signal* use this form:
+        
+    .. code-block:: python3
+
+        interface.off_[SIGNAL](callback)   
+        
+    Where ``SIGNAL`` is the name of the signal converted to snake case.
+
+    DBus signals are exposed with an event-callback interface. The provided
+    ``callback`` will be called when the signal is emitted with arguments that
+    correspond to the *out args* of the interface signal definition.
+
+    To *get or set a property* use this form:
+
+    .. code-block:: python3
+
+        value = await interface.get_[PROPERTY]()
+        await interface.set_[PROPERTY](value)
+
+    Where ``PROPERTY`` is the name of the property converted to snake case.
+
+    DBus property getters and setters are exposed as coroutines. The ``value``
+    must correspond to the type of the property in the interface definition.
+
+    If the service returns an error for a DBus call, a :class:`DBusError
+    <asyncdbus.DBusError>` will be raised with information about the error.
+
     :ivar bus_name: The name of the bus this interface is exported on.
     :vartype bus_name: str
     :ivar path: The object path exported on the client that owns the bus name.
@@ -36,7 +83,7 @@ class BaseProxyInterface:
     :ivar introspection: Parsed introspection data for the proxy interface.
     :vartype introspection: :class:`Node <asyncdbus.introspection.Interface>`
     :ivar bus: The message bus this proxy interface is connected to.
-    :vartype bus: :class:`BaseMessageBus <asyncdbus.message_bus.BaseMessageBus>`
+    :vartype bus: :class:`MessageBus <asyncdbus.message_bus.MessageBus>`
     """
     def __init__(self, bus_name, path, introspection, bus):
 
@@ -52,8 +99,8 @@ class BaseProxyInterface:
 
     @staticmethod
     def _to_snake_case(member):
-        subbed = BaseProxyInterface._underscorer1.sub(r'\1_\2', member)
-        return BaseProxyInterface._underscorer2.sub(r'\1_\2', subbed).lower()
+        subbed = ProxyInterface._underscorer1.sub(r'\1_\2', member)
+        return ProxyInterface._underscorer2.sub(r'\1_\2', subbed).lower()
 
     @staticmethod
     def _check_method_return(msg, signature=None):
@@ -66,10 +113,77 @@ class BaseProxyInterface:
                             f'method call returned unexpected signature: "{msg.signature}"', msg)
 
     def _add_method(self, intr_method):
-        raise NotImplementedError('this must be implemented in the inheriting class')
+        async def method_fn(*args, flags=MessageFlag.NONE):
+            input_body, unix_fds = replace_fds_with_idx(intr_method.in_signature, list(args))
+
+            msg = await self.bus.call(
+                Message(destination=self.bus_name,
+                        path=self.path,
+                        interface=self.introspection.name,
+                        member=intr_method.name,
+                        signature=intr_method.in_signature,
+                        body=input_body,
+                        flags=flags,
+                        unix_fds=unix_fds))
+
+            if flags & MessageFlag.NO_REPLY_EXPECTED:
+                return None
+
+            self._check_method_return(msg, intr_method.out_signature)
+
+            out_len = len(intr_method.out_args)
+
+            body = replace_idx_with_fds(msg.signature_tree, msg.body, msg.unix_fds)
+
+            if not out_len:
+                return None
+            elif out_len == 1:
+                return body[0]
+            else:
+                return body
+
+        method_name = f'call_{self._to_snake_case(intr_method.name)}'
+        setattr(self, method_name, method_fn)
 
     def _add_property(self, intr_property):
-        raise NotImplementedError('this must be implemented in the inheriting class')
+        async def property_getter():
+            msg = await self.bus.call(
+                Message(destination=self.bus_name,
+                        path=self.path,
+                        interface='org.freedesktop.DBus.Properties',
+                        member='Get',
+                        signature='ss',
+                        body=[self.introspection.name, intr_property.name]))
+
+            self._check_method_return(msg, 'v')
+            variant = msg.body[0]
+            if variant.signature != intr_property.signature:
+                raise DBusError(ErrorType.CLIENT_ERROR,
+                                f'property returned unexpected signature "{variant.signature}"',
+                                msg)
+
+            return replace_idx_with_fds('v', msg.body, msg.unix_fds)[0].value
+
+        async def property_setter(val):
+            variant = Variant(intr_property.signature, val)
+
+            body, unix_fds = replace_fds_with_idx(
+                'ssv', [self.introspection.name, intr_property.name, variant])
+
+            msg = await self.bus.call(
+                Message(destination=self.bus_name,
+                        path=self.path,
+                        interface='org.freedesktop.DBus.Properties',
+                        member='Set',
+                        signature='ssv',
+                        body=body,
+                        unix_fds=unix_fds))
+
+            self._check_method_return(msg)
+
+        snake_case = self._to_snake_case(intr_property.name)
+        setattr(self, f'get_{snake_case}', property_getter)
+        setattr(self, f'set_{snake_case}', property_setter)
 
     def _message_handler(self, msg):
         if not msg._matches(message_type=MessageType.SIGNAL,
@@ -128,17 +242,17 @@ class BaseProxyInterface:
                 self.bus._remove_match_rule(self._signal_match_rule)
                 self.bus.remove_message_handler(self._message_handler)
 
-        snake_case = BaseProxyInterface._to_snake_case(intr_signal.name)
+        snake_case = self._to_snake_case(intr_signal.name)
         setattr(interface, f'on_{snake_case}', on_signal_fn)
         setattr(interface, f'off_{snake_case}', off_signal_fn)
 
 
-class BaseProxyObject:
-    """An abstract class representing a proxy to an object exported on the bus by another client.
+class ProxyObject:
+    """The proxy object implementation for async IO.
 
     Implementations of this class are not meant to be constructed directly. Use
-    :func:`BaseMessageBus.get_proxy_object()
-    <asyncdbus.message_bus.BaseMessageBus.get_proxy_object>` to get a proxy
+    :func:`MessageBus.get_proxy_object()
+    <asyncdbus.message_bus.MessageBus.get_proxy_object>` to get a proxy
     object. Each message bus implementation provides its own proxy object
     implementation that will be returned by that method.
 
@@ -156,9 +270,9 @@ class BaseProxyObject:
     :ivar introspection: Parsed introspection data for the proxy object.
     :vartype introspection: :class:`Node <asyncdbus.introspection.Node>`
     :ivar bus: The message bus this proxy object is connected to.
-    :vartype bus: :class:`BaseMessageBus <asyncdbus.message_bus.BaseMessageBus>`
+    :vartype bus: :class:`MessageBus <asyncdbus.message_bus.MessageBus>`
     :ivar ~.ProxyInterface: The proxy interface class this proxy object uses.
-    :vartype ~.ProxyInterface: Type[:class:`BaseProxyInterface <asyncdbus.proxy_object.BaseProxyObject>`]
+    :vartype ~.ProxyInterface: Type[:class:`ProxyInterface <asyncdbus.proxy_object.ProxyObject>`]
     :ivar child_paths: A list of absolute object paths of the children of this object.
     :vartype child_paths: list(str)
 
@@ -168,14 +282,12 @@ class BaseProxyObject:
         - :class:`InvalidIntrospectionError <asyncdbus.InvalidIntrospectionError>` - If the introspection data for the node is not valid.
     """
     def __init__(self, bus_name: str, path: str, introspection: Union[intr.Node, str, ET.Element],
-                 bus: 'message_bus.BaseMessageBus', ProxyInterface: Type[BaseProxyInterface]):
+                 bus: 'message_bus.MessageBus'):
         assert_object_path_valid(path)
         assert_bus_name_valid(bus_name)
 
-        if not isinstance(bus, message_bus.BaseMessageBus):
-            raise TypeError('bus must be an instance of BaseMessageBus')
-        if not issubclass(ProxyInterface, BaseProxyInterface):
-            raise TypeError('ProxyInterface must be an instance of BaseProxyInterface')
+        if not isinstance(bus, message_bus.MessageBus):
+            raise TypeError('bus must be an instance of MessageBus')
 
         if type(introspection) is intr.Node:
             self.introspection = introspection
@@ -198,7 +310,7 @@ class BaseProxyObject:
         # lazy loaded by get_children()
         self._children = None
 
-    def get_interface(self, name: str) -> BaseProxyInterface:
+    def get_interface(self, name: str) -> ProxyInterface:
         """Get an interface exported on this proxy object and connect it to the bus.
 
         :param name: The name of the interface to retrieve.
@@ -247,7 +359,7 @@ class BaseProxyObject:
         self._interfaces[name] = interface
         return interface
 
-    def get_children(self) -> List['BaseProxyObject']:
+    def get_children(self) -> List['ProxyObject']:
         """Get the child nodes of this proxy object according to the introspection data."""
         if self._children is None:
             self._children = [

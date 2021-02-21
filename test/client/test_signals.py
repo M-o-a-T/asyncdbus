@@ -1,6 +1,5 @@
 from asyncdbus.service import ServiceInterface, signal
-from asyncdbus.aio import MessageBus
-from asyncdbus import Message
+from asyncdbus import Message, MessageBus
 from asyncdbus.introspection import Node
 from asyncdbus.constants import RequestNameReply
 
@@ -145,64 +144,59 @@ async def test_signals():
 async def test_signals_with_changing_owners():
   well_known_name = 'test.signals.changing.name'
 
-  async with MessageBus().connect() as bus1, \
-      MessageBus().connect() as bus2, \
-      MessageBus().connect() as bus3:
+  async with MessageBus().connect() as bus1, MessageBus().connect() as bus3:
+    async with MessageBus().connect() as bus2:
 
-    async def ping():
-        await bus1.call(
-            Message(destination=bus1.unique_name,
-                    interface='org.freedesktop.DBus.Peer',
-                    path='/test/path',
-                    member='Ping'))
+        async def ping():
+            await bus1.call(
+                Message(destination=bus1.unique_name,
+                        interface='org.freedesktop.DBus.Peer',
+                        path='/test/path',
+                        member='Ping'))
 
-    service_interface = ExampleInterface()
-    introspection = Node.default()
-    introspection.interfaces.append(service_interface.introspect())
+        service_interface = ExampleInterface()
+        introspection = Node.default()
+        introspection.interfaces.append(service_interface.introspect())
 
-    # get the interface before export
-    obj = bus1.get_proxy_object(well_known_name, '/test/path', introspection)
-    iface = obj.get_interface('test.interface')
-    counter = 0
+        # get the interface before export
+        obj = bus1.get_proxy_object(well_known_name, '/test/path', introspection)
+        iface = obj.get_interface('test.interface')
+        counter = 0
 
-    def handler(what):
-        nonlocal counter
-        counter += 1
+        def handler(what):
+            nonlocal counter
+            counter += 1
 
-    iface.on_some_signal(handler)
-    await ping()
+        iface.on_some_signal(handler)
+        await ping()
 
-    # now export and get the name
-    bus2.export('/test/path', service_interface)
-    result = await bus2.request_name(well_known_name)
-    assert result is RequestNameReply.PRIMARY_OWNER
+        # now export and get the name
+        bus2.export('/test/path', service_interface)
+        result = await bus2.request_name(well_known_name)
+        assert result is RequestNameReply.PRIMARY_OWNER
 
-    # the signal should work
-    service_interface.SomeSignal()
-    await ping()
-    assert counter == 1
-    counter = 0
+        # the signal should work
+        service_interface.SomeSignal()
+        await ping()
+        assert counter == 1
+        counter = 0
 
-    # now queue up a transfer of the name
-    service_interface2 = ExampleInterface()
-    bus3.export('/test/path', service_interface2)
-    result = await bus3.request_name(well_known_name)
-    assert result is RequestNameReply.IN_QUEUE
+        # now queue up a transfer of the name
+        service_interface2 = ExampleInterface()
+        bus3.export('/test/path', service_interface2)
+        result = await bus3.request_name(well_known_name)
+        assert result is RequestNameReply.IN_QUEUE
 
-    # if it doesn't own the name, the signal shouldn't work here
-    service_interface2.SomeSignal()
-    await ping()
-    assert counter == 0
+        # if it doesn't own the name, the signal shouldn't work here
+        service_interface2.SomeSignal()
+        await ping()
+        assert counter == 0
 
+    # here bus 2 is disconnected
     # now transfer over the name and it should work
-    bus2.disconnect()
     await ping()
 
     service_interface2.SomeSignal()
     await ping()
     assert counter == 1
     counter = 0
-
-    bus1.disconnect()
-    bus2.disconnect()
-    bus3.disconnect()

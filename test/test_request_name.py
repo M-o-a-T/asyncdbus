@@ -1,17 +1,13 @@
-from asyncdbus import aio, glib, Message, MessageType, NameFlag, RequestNameReply, ReleaseNameReply
-from test.util import check_gi_repository, skip_reason_no_gi
+from asyncdbus import Message, MessageBus, MessageType, NameFlag, RequestNameReply, ReleaseNameReply
 
 import pytest
 
-has_gi = check_gi_repository()
-
-
 @pytest.mark.anyio
 async def test_name_requests():
-  test_name = 'aio.test.request.name'
+  test_name = 'test.request.name'
 
-  async with aio.MessageBus().connect() as bus1, \
-          aio.MessageBus().connect() as bus2:
+  async with MessageBus().connect() as bus1, \
+          MessageBus().connect() as bus2:
 
     async def get_name_owner(name):
         reply = await bus1.call(
@@ -50,20 +46,3 @@ async def test_name_requests():
 
     reply = await bus1.request_name(test_name, NameFlag.DO_NOT_QUEUE | NameFlag.REPLACE_EXISTING)
     assert reply == RequestNameReply.PRIMARY_OWNER
-
-    bus1.disconnect()
-    bus2.disconnect()
-
-
-@pytest.mark.skipif(not has_gi, reason=skip_reason_no_gi)
-def test_request_name_glib():
-    test_name = 'glib.test.request.name'
-    bus = glib.MessageBus().connect_sync()
-
-    reply = bus.request_name_sync(test_name)
-    assert reply == RequestNameReply.PRIMARY_OWNER
-
-    reply = bus.release_name_sync(test_name)
-    assert reply == ReleaseNameReply.RELEASED
-
-    bus.disconnect()

@@ -19,9 +19,7 @@ The primary methods and classes of the low-level interface are:
 - :func:`MessageBus.add_message_handler() <asyncdbus.message_bus.BaseMessageBus.add_message_handler>`
 - :func:`MessageBus.remove_message_handler() <asyncdbus.message_bus.BaseMessageBus.remove_message_handler>`
 - :func:`MessageBus.next_serial() <asyncdbus.message_bus.BaseMessageBus.next_serial>`
-- :func:`aio.MessageBus.call() <asyncdbus.aio.MessageBus.call>`
-- :func:`glib.MessageBus.call() <asyncdbus.glib.MessageBus.call>`
-- :func:`glib.MessageBus.call_sync() <asyncdbus.glib.MessageBus.call_sync>`
+- :func:`MessageBus.call() <asyncdbus.MessageBus.call>`
 
 Mixed use of the low and high level interfaces on the same bus connection is not recommended.
 
@@ -47,24 +45,22 @@ Mixed use of the low and high level interfaces on the same bus connection is not
 
 .. code-block:: python3
 
-    bus = await MessageBus().connect()
+    async with MessageBus().connect() as bus:
 
-    reply = await bus.call(
-        Message(destination='org.freedesktop.DBus',
-                path='/org/freedesktop/DBus',
-                member='AddMatch',
-                signature='s',
-                body=["member='MyMember', interface='com.test.interface'"]))
+        reply = await bus.call(
+            Message(destination='org.freedesktop.DBus',
+                    path='/org/freedesktop/DBus',
+                    member='AddMatch',
+                    signature='s',
+                    body=["member='MyMember', interface='com.test.interface'"]))
 
-    assert reply.message_type == MessageType.METHOD_RETURN
+        assert reply.message_type == MessageType.METHOD_RETURN
 
-    def message_handler(msg):
-        if msg.interface == 'com.test.interface' and msg.member == 'MyMember':
-            return Message.new_method_return(msg, 's', ['got it'])
+        def message_handler(msg):
+            if msg.interface == 'com.test.interface' and msg.member == 'MyMember':
+                return Message.new_method_return(msg, 's', ['got it'])
 
-    bus.add_message_handler(message_handler)
-
-    await bus.wait_for_disconnect()
+        bus.add_message_handler(message_handler)
 
 :example: Emit a signal
 

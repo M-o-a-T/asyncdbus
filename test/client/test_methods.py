@@ -1,13 +1,9 @@
 from asyncdbus.message import MessageFlag
 from asyncdbus.service import ServiceInterface, method
 import asyncdbus.introspection as intr
-from asyncdbus import aio, glib, DBusError
-from test.util import check_gi_repository, skip_reason_no_gi
+from asyncdbus import MessageBus, DBusError, ProxyObject
 
 import pytest
-
-has_gi = check_gi_repository()
-
 
 class ExampleInterface(ServiceInterface):
     def __init__(self):
@@ -40,10 +36,10 @@ class ExampleInterface(ServiceInterface):
 
 @pytest.mark.anyio
 async def test_aio_proxy_object():
-  bus_name = 'aio.client.test.methods'
+  bus_name = 'client.test.methods'
 
-  async with aio.MessageBus().connect() as bus, \
-          aio.MessageBus().connect() as bus2:
+  async with MessageBus().connect() as bus, \
+          MessageBus().connect() as bus2:
     await bus.request_name(bus_name)
     service_interface = ExampleInterface()
     bus.export('/test/path', service_interface)
@@ -59,7 +55,7 @@ async def test_aio_proxy_object():
     children = obj.get_children()
     assert len(children) == 2
     for child in obj.get_children():
-        assert type(child) is aio.ProxyObject
+        assert type(child) is ProxyObject
 
     result = await interface.call_ping()
     assert result is None
@@ -88,42 +84,3 @@ async def test_aio_proxy_object():
             assert e.text == 'something went wrong'
             raise e
 
-
-@pytest.mark.skipif(not has_gi, reason=skip_reason_no_gi)
-def test_glib_proxy_object():
-    bus_name = 'glib.client.test.methods'
-    bus = glib.MessageBus().connect_sync()
-    bus.request_name_sync(bus_name)
-    service_interface = ExampleInterface()
-    bus.export('/test/path', service_interface)
-
-    bus2 = glib.MessageBus().connect_sync()
-    introspection = bus2.introspect_sync(bus_name, '/test/path')
-    assert type(introspection) is intr.Node
-    obj = bus.get_proxy_object(bus_name, '/test/path', introspection)
-    interface = obj.get_interface(service_interface.name)
-
-    result = interface.call_ping_sync()
-    assert result is None
-
-    result = interface.call_echo_string_sync('hello')
-    assert result == 'hello'
-
-    result = interface.call_concat_strings_sync('hello ', 'world')
-    assert result == 'hello world'
-
-    result = interface.call_echo_three_sync('hello', 'there', 'world')
-    assert result == ['hello', 'there', 'world']
-
-    with pytest.raises(DBusError):
-        try:
-            result = interface.call_throws_error_sync()
-            assert False, result
-        except DBusError as e:
-            assert e.reply is not None
-            assert e.type == 'test.error'
-            assert e.text == 'something went wrong'
-            raise e
-
-    bus.disconnect()
-    bus2.disconnect()

@@ -51,7 +51,7 @@ For more information, see the [overview for the high-level client](https://pytho
 This example connects to a media player and controls it with the [MPRIS](https://specifications.freedesktop.org/mpris-spec/latest/) DBus interface.
 
 ```python
-from asyncdbus.aio import MessageBus
+from asyncdbus import MessageBus
 
 import anyio
 
@@ -94,7 +94,7 @@ For more information, see the [overview for the high-level service](https://pyth
 
 ```python
 from asyncdbus.service import ServiceInterface, method, dbus_property, signal, Variant
-from asyncdbus.aio MessageBus
+from asyncdbus import MessageBus
 
 import anyio
 
@@ -147,7 +147,7 @@ For more information, see the [overview for the low-level interface](https://pyt
 
 ```python
 from asyncdbus.message import Message, MessageType
-from asyncdbus.aio import MessageBus
+from asyncdbus import MessageBus
 
 import anyio
 import json
