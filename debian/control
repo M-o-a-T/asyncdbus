@@ -1,0 +1,33 @@
+Source: asyncdbus
+Maintainer: Matthias Urlichs <matthias@urlichs.de>
+Section: python
+Priority: optional
+Build-Depends: dh-python, python3-setuptools, python3-all, debhelper (>= 9)
+Standards-Version: 3.9.6
+Homepage: https://github.com/M-o-a-T/asyncdbus
+
+Package: python3-asyncdbus
+Architecture: all
+Depends: ${misc:Depends}, ${python3:Depends}
+Description: A zero-dependency async DBus library
+ .
+ # asyncdbus
+ .
+ This is a fork of python-dbus-next. It uses anyio under the hood, thus is
+ compatible with Trio as well as asyncio.
+ .
+ Support for GLib has been removed. If you need that, use Trio in guest
+ mode.
+ .
+ This library is available on PyPi as [asyncdbus](https://pypi.org/project/asyncdbus/).
+ .
+ The rest of this document is from dbus-next and has not been modified.
+ .
+ # python-dbus-next
+ .
+ The next great DBus library for Python.
+ .
+ [Documentation](https://python-dbus-next.readthedocs.io/en/latest/)
+ .
+ [Chat](https://discord.gg/UdbXHVX)
+
