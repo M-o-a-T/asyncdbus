@@ -6,9 +6,9 @@ The High Level Service
 
    service-interface
 
-The high level service interface provides everything you need to export interfaces on the bus. When you export an interface on your :class:`MessageBus <asyncdbus.message_bus.BaseMessageBus>`, clients can send you messages to call methods, get and set properties, and listen to your signals.
+The high level service interface provides everything you need to export interfaces on the bus. When you export an interface on your :class:`MessageBus <asyncdbus.message_bus.MessageBus>`, clients can send you messages to call methods, get and set properties, and listen to your signals.
 
-If you're exposing a service for general use, you can request a well-known name for your connection with :func:`MessageBus.request_name() <asyncdbus.message_bus.BaseMessageBus.request_name>` so users have a predictable name to use to send messages your client.
+If you're exposing a service for general use, you can request a well-known name for your connection with :func:`MessageBus.request_name() <asyncdbus.message_bus.MessageBus.request_name>` so users have a predictable name to use to send messages your client.
 
 Services are defined by subclassing :class:`ServiceInterface <asyncdbus.service.ServiceInterface>` and definining members as methods on the class with the decorator methods :func:`@method() <asyncdbus.service.method>`, :func:`@dbus_property() <asyncdbus.service.dbus_property>`, and :func:`@signal() <asyncdbus.service.signal>`. The parameters of the decorated class methods must be annotated with DBus type strings to indicate the types of values they expect. See the documentation on `the type system </type-system/index.html>`_ for more information on how DBus types are mapped to Python values with signature strings. The decorator methods themselves take arguments that affect how the member is exported on the bus, such as the name of the member or the access permissions of a property.
 
@@ -20,7 +20,7 @@ A class method decorated with ``@signal()`` will be exposed as a DBus signal. Th
 
 A class method decorated with ``@method()`` or ``@dbus_property()`` may throw a :class:`DBusError <asyncdbus.DBusError>` to return a detailed error to the client if something goes wrong.
 
-After the service interface is defined, call :func:`MessageBus.export() <asyncdbus.message_bus.BaseMessageBus.export>` on a connected message bus and the service will be made available on the given object path.
+After the service interface is defined, call :func:`MessageBus.export() <asyncdbus.message_bus.MessageBus.export>` on a connected message bus and the service will be made available on the given object path.
 
 If any file descriptors are sent or received (DBus type `UnixFD` or ``h``), the variable refers to the file descriptor itself. You are responsible for closing any file descriptors sent or received by the bus. You must set the ``negotiate_unix_fd`` flag to ``True`` in the ``MessageBus`` constructor to use unix file descriptors.
 

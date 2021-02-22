@@ -311,8 +311,8 @@ class ServiceInterface:
     """An abstract class that can be extended by the user to define DBus services.
 
     Instances of :class:`ServiceInterface` can be exported on a path of the bus
-    with the :class:`export <asyncdbus.message_bus.BaseMessageBus.export>`
-    method of a :class:`MessageBus <asyncdbus.message_bus.BaseMessageBus>`.
+    with the :class:`export <asyncdbus.message_bus.MessageBus.export>`
+    method of a :class:`MessageBus <asyncdbus.message_bus.MessageBus>`.
 
     Use the :func:`@method <asyncdbus.service.method>`, :func:`@dbus_property
     <asyncdbus.service.dbus_property>`, and :func:`@signal
