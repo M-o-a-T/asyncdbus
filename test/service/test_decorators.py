@@ -68,7 +68,7 @@ def test_method_decorator():
 
     method = methods[1]
     assert method.name == 'some_method'
-    assert method.in_signature == Tuple[Str,Str].tree.signature
+    assert method.in_signature == Tuple[Str, Str].tree.signature
     assert method.out_signature == Str
     assert not method.disabled
     assert type(method.introspection) is intr.Method

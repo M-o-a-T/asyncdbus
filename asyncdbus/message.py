@@ -235,7 +235,7 @@ class Message:
             fields.append([HeaderField.DESTINATION.value, Variant('s', self.destination)])
         sig = self.signature
         if sig:
-            if hasattr(sig,'tree'):
+            if hasattr(sig, 'tree'):
                 sig = sig.tree.signature
             fields.append([HeaderField.SIGNATURE.value, Variant('g', sig)])
         if self.unix_fds and negotiate_unix_fd:

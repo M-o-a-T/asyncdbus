@@ -323,9 +323,8 @@ class MessageBus:
         self._check_method_return(reply, None, 'u')
         return ReleaseNameReply(reply.body[0])
 
-
     async def get_proxy_object(self, bus_name: str, path: str,
-                         introspection: Union[intr.Node, str, ET.Element]) -> ProxyObject:
+                               introspection: Union[intr.Node, str, ET.Element]) -> ProxyObject:
         """Get a proxy object for the path exported on the bus that owns the
         name. The object is expected to export the interfaces and nodes
         specified in the introspection data.
@@ -443,12 +442,12 @@ class MessageBus:
         return False
 
     async def _interface_signal_notify(self,
-                                 interface,
-                                 interface_name,
-                                 member,
-                                 signature,
-                                 body,
-                                 unix_fds=[]):
+                                       interface,
+                                       interface_name,
+                                       member,
+                                       signature,
+                                       body,
+                                       unix_fds=[]):
         path = None
         for p, ifaces in self._path_exports.items():
             for i in ifaces:
@@ -600,7 +599,8 @@ class MessageBus:
     def _check_method_return(msg, err=None, signature=None):
         if err:
             raise err
-        elif msg.message_type == MessageType.METHOD_RETURN and (signature is None or msg.signature == signature):
+        elif msg.message_type == MessageType.METHOD_RETURN and (signature is None
+                                                                or msg.signature == signature):
             return
         elif msg.message_type == MessageType.ERROR:
             raise DBusError._from_message(msg)
@@ -865,7 +865,7 @@ class MessageBus:
                     raise DBusError(ErrorType.PROPERTY_READ_ONLY, 'the property is readonly')
                 value = msg.body[2]
                 sig = prop.signature
-                if hasattr(sig,'tree'):
+                if hasattr(sig, 'tree'):
                     sig = sig.tree.signature
                 if value.signature != sig:
                     raise DBusError(ErrorType.INVALID_SIGNATURE,
@@ -1091,8 +1091,8 @@ class MessageBus:
         if not msg.serial:
             msg.serial = self.next_serial()
 
-        await self._write_one(msg._marshall(negotiate_unix_fd=self._negotiate_unix_fd),
-                                 copy(msg.unix_fds))
+        await self._write_one(
+            msg._marshall(negotiate_unix_fd=self._negotiate_unix_fd), copy(msg.unix_fds))
 
     def send_soon(self, msg: Message):
         """Queue a message on the message bus for transmission.
@@ -1157,7 +1157,7 @@ class MessageBus:
                 unmarshaller.feed(data, aux)
 
                 for msg in unmarshaller:
-                    self._tg.spawn(self._on_message,msg)
+                    self._tg.spawn(self._on_message, msg)
 
     async def _message_writer(self, *, task_status):
         with anyio.open_cancel_scope() as sc:
@@ -1170,7 +1170,7 @@ class MessageBus:
     async def _write_one(self, buf, unix_fds):
         async with self._write_lock:
             if self._sock is None:
-                return # raise EOFError
+                return  # raise EOFError
             buf = memoryview(buf)
             done = 0
             while done < len(buf) or (unix_fds and self._negotiate_unix_fd):
@@ -1178,8 +1178,7 @@ class MessageBus:
                 if self._sock is None:
                     raise EOFError
                 if unix_fds and self._negotiate_unix_fd:
-                    ancdata = [(socket.SOL_SOCKET, socket.SCM_RIGHTS, array.array(
-                        "i", unix_fds))]
+                    ancdata = [(socket.SOL_SOCKET, socket.SCM_RIGHTS, array.array("i", unix_fds))]
 
                     done2 = self._sock.sendmsg([buf[done:]], ancdata)
                     unix_fds = None

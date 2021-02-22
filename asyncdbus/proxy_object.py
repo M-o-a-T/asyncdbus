@@ -5,7 +5,7 @@ from .constants import MessageType, ErrorType, MessageFlag
 from . import introspection as intr
 from .errors import DBusError, InterfaceNotFoundError
 from ._private.util import replace_idx_with_fds, replace_fds_with_idx
-from .signature import Variant, Str,Var,Tuple
+from .signature import Variant, Str, Var, Tuple
 
 from typing import Type, Union, List
 import logging
@@ -105,7 +105,7 @@ class ProxyInterface:
 
     @staticmethod
     def _check_method_return(msg, signature=None):
-        if hasattr(signature,'tree'):
+        if hasattr(signature, 'tree'):
             signature = signature.tree.signature
         if msg.message_type == MessageType.ERROR:
             raise DBusError._from_message(msg)
@@ -157,13 +157,13 @@ class ProxyInterface:
                     path=self.path,
                     interface='org.freedesktop.DBus.Properties',
                     member='Get',
-                    signature=Tuple[Str,Str],
+                    signature=Tuple[Str, Str],
                     body=[self.introspection.name, intr_property.name]))
 
             self._check_method_return(msg, Var)
             variant = msg.body[0]
             sig = intr_property.signature
-            if hasattr(sig,'tree'):
+            if hasattr(sig, 'tree'):
                 sig = sig.tree.signature
             if variant.signature != sig:
                 raise DBusError(ErrorType.CLIENT_ERROR,
@@ -184,7 +184,7 @@ class ProxyInterface:
                     path=self.path,
                     interface='org.freedesktop.DBus.Properties',
                     member='Set',
-                    signature=Tuple[Str,Str,Var],
+                    signature=Tuple[Str, Str, Var],
                     body=body,
                     unix_fds=unix_fds))
 

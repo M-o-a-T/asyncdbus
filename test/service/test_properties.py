@@ -5,7 +5,8 @@ from asyncdbus.signature import Tuple, Str
 import pytest
 import anyio
 
-from asyncdbus.signature import Str,Array,Struct,Dict,Int64
+from asyncdbus.signature import Str, Array, Struct, Dict, Int64
+
 
 class ExampleInterface(ServiceInterface):
     def __init__(self, name):
@@ -29,11 +30,11 @@ class ExampleInterface(ServiceInterface):
         return self._readonly_prop
 
     @dbus_property()
-    def container_prop(self) -> Array[Struct[Str,Str]]:
+    def container_prop(self) -> Array[Struct[Str, Str]]:
         return self._container_prop
 
     @container_prop.setter
-    def container_prop(self, val: Array[Struct[Str,Str]]):
+    def container_prop(self, val: Array[Struct[Str, Str]]):
         self._container_prop = val
 
     @dbus_property(name='renamed_prop')
@@ -96,7 +97,7 @@ async def test_property_methods():
             'renamed_prop': Variant(Str, interface._renamed_prop)
         }]
 
-        result = await call_properties('Get', Tuple[Str,Str], [interface.name, 'string_prop'])
+        result = await call_properties('Get', Tuple[Str, Str], [interface.name, 'string_prop'])
         assert result.message_type == MessageType.METHOD_RETURN, result.body[0]
         assert result.signature == 'v'
         assert result.body == [Variant(Str, 'hi')]
@@ -108,17 +109,17 @@ async def test_property_methods():
         assert interface.string_prop == 'ho'
 
         with pytest.raises(DBusError) as err:
-            await call_properties(
-                'Set', 'ssv',
-                [interface.name, 'readonly_prop', Variant(Int64, 100)])
+            await call_properties('Set', 'ssv',
+                                  [interface.name, 'readonly_prop',
+                                   Variant(Int64, 100)])
         result = err.value.reply
         assert result.message_type == MessageType.ERROR, result.body[0]
         assert result.error_name == ErrorType.PROPERTY_READ_ONLY.value, result.body[0]
 
         with pytest.raises(DBusError) as err:
-            result = await call_properties(
-                'Set', 'ssv',
-                [interface.name, 'disabled_prop', Variant(Str, 'asdf')])
+            result = await call_properties('Set', 'ssv',
+                                           [interface.name, 'disabled_prop',
+                                            Variant(Str, 'asdf')])
         result = err.value.reply
         assert result.message_type == MessageType.ERROR, result.body[0]
         assert result.error_name == ErrorType.UNKNOWN_PROPERTY.value
@@ -155,7 +156,7 @@ async def test_property_methods():
         assert result.body == ['told you so']
 
         with pytest.raises(DBusError) as err:
-            await call_properties('Get', Tuple[Str,Str], [interface.name, 'throws_error'])
+            await call_properties('Get', Tuple[Str, Str], [interface.name, 'throws_error'])
         result = err.value.reply
         assert result.message_type == MessageType.ERROR, result.body[0]
         assert result.error_name == 'test.error'

@@ -15,8 +15,7 @@ async def main():
         introspection = await bus.introspect('org.mpris.MediaPlayer2.vlc',
                                              '/org/mpris/MediaPlayer2')
 
-        obj = await bus.get_proxy_object('org.mpris.MediaPlayer2.vlc',
-                                         '/org/mpris/MediaPlayer2',
+        obj = await bus.get_proxy_object('org.mpris.MediaPlayer2.vlc', '/org/mpris/MediaPlayer2',
                                          introspection)
         player = await obj.get_interface('org.mpris.MediaPlayer2.Player')
         properties = await obj.get_interface('org.freedesktop.DBus.Properties')

@@ -16,7 +16,7 @@ class ExampleInterface(ServiceInterface):
         return 'hello'
 
     @signal()
-    def SignalMultiple(self) -> Tuple[Str,Str]:
+    def SignalMultiple(self) -> Tuple[Str, Str]:
         return ['hello', 'world']
 
 
@@ -26,7 +26,8 @@ async def test_signals():
             MessageBus().connect() as bus2:
 
         bus_intr = await bus1.introspect('org.freedesktop.DBus', '/org/freedesktop/DBus')
-        bus_obj = await bus1.get_proxy_object('org.freedesktop.DBus', '/org/freedesktop/DBus', bus_intr)
+        bus_obj = await bus1.get_proxy_object('org.freedesktop.DBus', '/org/freedesktop/DBus',
+                                              bus_intr)
         stats = await bus_obj.get_interface('org.freedesktop.DBus.Debug.Stats')
 
         await bus1.request_name('test.signals.name')
@@ -34,7 +35,7 @@ async def test_signals():
         await bus1.export('/test/path', service_interface)
 
         obj = await bus2.get_proxy_object('test.signals.name', '/test/path',
-                                    bus1._introspect_export_path('/test/path'))
+                                          bus1._introspect_export_path('/test/path'))
         interface = await obj.get_interface(service_interface.name)
 
         async def ping():
@@ -113,7 +114,7 @@ async def test_signals():
             await bus3.export('/test/path', service_interface2)
 
             obj = await bus2.get_proxy_object('test.signals.name2', '/test/path',
-                                        bus3._introspect_export_path('/test/path'))
+                                              bus3._introspect_export_path('/test/path'))
             # we have to add a dummy handler to add the match rule
             iface2 = await obj.get_interface(service_interface2.name)
 

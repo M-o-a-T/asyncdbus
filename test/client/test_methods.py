@@ -28,7 +28,7 @@ class ExampleInterface(ServiceInterface):
         return what1 + what2
 
     @method()
-    def EchoThree(self, what1: Str, what2: Str, what3: Str) -> Tuple[Str,Str,Str]:
+    def EchoThree(self, what1: Str, what2: Str, what3: Str) -> Tuple[Str, Str, Str]:
         return [what1, what2, what3]
 
     @method()

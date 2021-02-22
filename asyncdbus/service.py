@@ -363,8 +363,8 @@ class ServiceInterface:
                 raise ValueError(f'property "{prop.name}" is writable but does not have a setter')
 
     async def emit_properties_changed(self,
-                                changed_properties: Dict[str, Any],
-                                invalidated_properties: List[str] = []):
+                                      changed_properties: Dict[str, Any],
+                                      invalidated_properties: List[str] = []):
         """Emit the ``org.freedesktop.DBus.Properties.PropertiesChanged`` signal.
 
         This signal is intended to be used to alert clients when a property of
@@ -385,7 +385,7 @@ class ServiceInterface:
         body = [self.name, variant_dict, invalidated_properties]
         for bus in ServiceInterface._get_buses(self):
             await bus._interface_signal_notify(self, 'org.freedesktop.DBus.Properties',
-                                         'PropertiesChanged', 'sa{sv}as', body)
+                                               'PropertiesChanged', 'sa{sv}as', body)
 
     def introspect(self) -> intr.Interface:
         """Get introspection information for this interface.
@@ -473,5 +473,5 @@ class ServiceInterface:
         body, fds = ServiceInterface._fn_result_to_body(result, signal.signature_tree)
         for bus in ServiceInterface._get_buses(interface):
             # TODO: can signal pass fds?
-            await bus._interface_signal_notify(interface, interface.name, signal.name, signal.signature,
-                                         body, fds)
+            await bus._interface_signal_notify(interface, interface.name, signal.name,
+                                               signal.signature, body, fds)

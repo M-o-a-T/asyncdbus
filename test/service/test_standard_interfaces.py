@@ -1,5 +1,5 @@
 from asyncdbus.service import ServiceInterface, dbus_property, PropertyAccess
-from asyncdbus.signature import Variant,Str,Var,Array,Empty,Byte,Tuple
+from asyncdbus.signature import Variant, Str, Var, Array, Empty, Byte, Tuple
 from asyncdbus.errors import DBusError
 from asyncdbus import Message, MessageBus, MessageType, introspection as intr
 from asyncdbus.constants import ErrorType
@@ -181,7 +181,7 @@ async def test_standard_interface_properties():
                         path=export_path,
                         interface='org.freedesktop.DBus.Properties',
                         member='Get',
-                        signature=Tuple[Str,Str],
+                        signature=Tuple[Str, Str],
                         body=[iface, 'anything']))
             result = err.value.reply
             assert result.message_type is MessageType.ERROR
@@ -194,7 +194,7 @@ async def test_standard_interface_properties():
                         path=export_path,
                         interface='org.freedesktop.DBus.Properties',
                         member='Set',
-                        signature=Tuple[Str,Str,Var],
+                        signature=Tuple[Str, Str, Var],
                         body=[iface, 'anything', Variant(Str, 'new thing')]))
             result = err.value.reply
             assert result.message_type is MessageType.ERROR

@@ -1,6 +1,6 @@
 from asyncdbus import SignatureTree, SignatureBodyMismatchError, Variant
 from asyncdbus._private.util import signature_contains_type
-from asyncdbus.signature import Str,Array,Struct,Dict,Int64
+from asyncdbus.signature import Str, Array, Struct, Dict, Int64
 
 import pytest
 
@@ -8,13 +8,13 @@ import pytest
 def test_signatures():
     assert Int64.tree.signature == 'x'
     assert Str.tree.signature == 's'
-    assert Struct[Int64,Str].tree.signature == '(xs)'
-    assert Array[Struct[Int64,Str]].tree.signature == 'a(xs)'
-    assert Array[Dict[Str,Int64]].tree.signature == 'a{sx}'
+    assert Struct[Int64, Str].tree.signature == '(xs)'
+    assert Array[Struct[Int64, Str]].tree.signature == 'a(xs)'
+    assert Array[Dict[Str, Int64]].tree.signature == 'a{sx}'
 
 
 def assert_simple_type(signature, type_):
-    if hasattr(signature,'tree'):
+    if hasattr(signature, 'tree'):
         signature = signature.tree.signature
     assert type_.token == signature
     assert type_.signature == signature

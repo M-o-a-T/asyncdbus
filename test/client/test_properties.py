@@ -42,7 +42,7 @@ async def test_aio_properties():
 
         async with MessageBus().connect() as bus:
             obj = await bus.get_proxy_object(service_bus.unique_name, '/test/path',
-                                       service_bus._introspect_export_path('/test/path'))
+                                             service_bus._introspect_export_path('/test/path'))
             interface = await obj.get_interface(service_interface.name)
 
             prop = await interface.get_some_property()

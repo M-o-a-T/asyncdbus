@@ -58,7 +58,8 @@ async def test_tcp_connection_with_forwarding():
                 assert result
 
                 intr = await bus.introspect('org.freedesktop.DBus', '/org/freedesktop/DBus')
-                obj = await bus.get_proxy_object('org.freedesktop.DBus', '/org/freedesktop/DBus', intr)
+                obj = await bus.get_proxy_object('org.freedesktop.DBus', '/org/freedesktop/DBus',
+                                                 intr)
                 iface = await obj.get_interface('org.freedesktop.DBus.Peer')
                 await iface.call_ping()
 

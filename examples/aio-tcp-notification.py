@@ -22,8 +22,7 @@ async def main():
         introspection = await bus.introspect('org.freedesktop.Notifications',
                                              '/org/freedesktop/Notifications')
         obj = await bus.get_proxy_object('org.freedesktop.Notifications',
-                                         '/org/freedesktop/Notifications',
-                                         introspection)
+                                         '/org/freedesktop/Notifications', introspection)
         notification = await obj.get_interface('org.freedesktop.Notifications')
         await notification.call_notify("test.py", 0, "", "DBus Test", "Test notification", [""],
                                        dict(), 5000)

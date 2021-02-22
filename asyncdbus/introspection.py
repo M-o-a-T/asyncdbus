@@ -44,7 +44,7 @@ class Arg:
             assert_member_name_valid(name)
 
         type_ = None
-        if hasattr(signature,'tree'):
+        if hasattr(signature, 'tree'):
             signature = signature.tree.signature
 
         if type(signature) is SignatureType:
@@ -256,7 +256,7 @@ class Property:
                  access: PropertyAccess = PropertyAccess.READWRITE):
         assert_member_name_valid(name)
 
-        if hasattr(signature,'tree'):
+        if hasattr(signature, 'tree'):
             signature = signature.tree.signature
         tree = SignatureTree._get(signature)
         if len(tree.types) != 1:

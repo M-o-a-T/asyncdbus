@@ -1,5 +1,5 @@
 from asyncdbus import Message, MessageType, MessageFlag, MessageBus, DBusError
-from asyncdbus.signature import Array,Str
+from asyncdbus.signature import Array, Str
 
 import pytest
 import anyio

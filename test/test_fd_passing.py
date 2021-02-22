@@ -182,7 +182,9 @@ async def test_high_level_service_fd_passing():
 
         # properties
         reply = await call(
-            'Get', Tuple[Str,Str], [interface_name, 'PropFd'], iface='org.freedesktop.DBus.Properties')
+            'Get',
+            Tuple[Str, Str], [interface_name, 'PropFd'],
+            iface='org.freedesktop.DBus.Properties')
         assert reply.message_type == MessageType.METHOD_RETURN, reply.body
         assert reply.body[0].signature == UnixFD.tree.signature
         assert reply.body[0].value == 0
@@ -194,7 +196,8 @@ async def test_high_level_service_fd_passing():
         fd = open_file()
         reply = await call(
             'Set',
-            Tuple[Str,Str,Var], [interface_name, 'PropFd', Variant(UnixFD, 0)],
+            Tuple[Str, Str, Var],
+            [interface_name, 'PropFd', Variant(UnixFD, 0)],
             iface='org.freedesktop.DBus.Properties',
             unix_fds=[fd])
         assert reply.message_type == MessageType.METHOD_RETURN, reply.body
@@ -282,39 +285,42 @@ async def test_sending_file_descriptor_with_proxy():
         pytest.param([5, 7], 'ah', ([[0, 1]], [5, 7]), id='Signature: "ah"'),
         pytest.param([9], Array[UnixFD], ([[0]], [9]), id='Signature: "ah"'),
         pytest.param([3], Struct[UnixFD], ([[0]], [3]), id='Signature: "(h)"'),
-        pytest.param([3, "foo"], Struct[UnixFD,Str], ([[0, "foo"]], [3]), id='Signature: "(hs)"'),
+        pytest.param([3, "foo"], Struct[UnixFD, Str], ([[0, "foo"]], [3]), id='Signature: "(hs)"'),
         pytest.param([[7, "foo"], [8, "bar"]],
-                     Array[Struct[UnixFD,Str]], ([[[0, "foo"], [1, "bar"]]], [7, 8]),
+                     Array[Struct[UnixFD, Str]], ([[[0, "foo"], [1, "bar"]]], [7, 8]),
                      id='Signature: "a(hs)"'),
-        pytest.param({
-            "foo": 3
-        }, Array[Dict[Str,UnixFD]], ([{
-            "foo": 0
-        }], [3]), id='Signature: "a{sh}"'),
+        pytest.param(
+            {
+                "foo": 3
+            }, Array[Dict[Str, UnixFD]], ([{
+                "foo": 0
+            }], [3]), id='Signature: "a{sh}"'),
         pytest.param({
             "foo": 3,
             "bar": 6
         },
-                     Array[Dict[Str,UnixFD]], ([{
+                     Array[Dict[Str, UnixFD]], ([{
                          "foo": 0,
                          "bar": 1
                      }], [3, 6]),
                      id='Signature: "a{sh}"'),
-        pytest.param(
-            {
-                "foo": [3, 8]
-            }, Array[Dict[Str,Array[UnixFD]]], ([{
-                "foo": [0, 1]
-            }], [3, 8]), id='Signature: "a{sah}"'),
+        pytest.param({
+            "foo": [3, 8]
+        },
+                     Array[Dict[Str, Array[UnixFD]]], ([{
+                         "foo": [0, 1]
+                     }], [3, 8]),
+                     id='Signature: "a{sah}"'),
         pytest.param({
             'foo': Variant('t', 100)
         },
-                     Array[Dict[Str,Var]], ([{
+                     Array[Dict[Str, Var]], ([{
                          'foo': Variant('t', 100)
                      }], []),
                      id='Signature: "a{sv}"'),
         pytest.param(['one', ['two', [Variant(Str, 'three')]]],
-                     Struct[Str,Struct[Str,Struct[Var]]], ([['one', ['two', [Variant(Str, 'three')]]]], []),
+                     Struct[Str, Struct[Str, Struct[Var]]],
+                     ([['one', ['two', [Variant(Str, 'three')]]]], []),
                      id='Signature: "(s(s(v)))"'),
         pytest.param(Variant(UnixFD, 2), 'v', ([Variant(UnixFD, 0)], [2]), id='Variant with: "h"'),
         pytest.param(

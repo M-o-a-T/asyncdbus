@@ -23,7 +23,7 @@ class ExampleInterface(ServiceInterface):
         return 'hello'
 
     @signal()
-    def signal_multiple(self) -> Tuple[Str,Str]:
+    def signal_multiple(self) -> Tuple[Str, Str]:
         assert type(self) is ExampleInterface
         return ['hello', 'world']
 
@@ -163,7 +163,7 @@ async def test_signals():
                 signal=await expected_signal,
                 export_path=export_path,
                 member='signal_multiple',
-                signature=Tuple[Str,Str],
+                signature=Tuple[Str, Str],
                 body=['hello', 'world'])
 
         with pytest.raises(SignalDisabledError):
@@ -196,7 +196,7 @@ async def test_interface_add_remove_signal():
                 signal=await expected_signal,
                 export_path=export_path,
                 member='InterfacesAdded',
-                signature=Tuple[ObjPath,Array[Dict[Str,Array[Dict[Str,Var]]]]],
+                signature=Tuple[ObjPath, Array[Dict[Str, Array[Dict[Str, Var]]]]],
                 body=[export_path, {
                     'test.interface.first': {
                         'test_prop': Variant('i', 42)
@@ -211,7 +211,7 @@ async def test_interface_add_remove_signal():
                 signal=await expected_signal,
                 export_path=export_path,
                 member='InterfacesAdded',
-                signature=Tuple[ObjPath,Array[Dict[Str,Array[Dict[Str,Var]]]]],
+                signature=Tuple[ObjPath, Array[Dict[Str, Array[Dict[Str, Var]]]]],
                 body=[
                     export_path,
                     {
@@ -230,7 +230,7 @@ async def test_interface_add_remove_signal():
                 signal=await expected_signal,
                 export_path=export_path,
                 member='InterfacesRemoved',
-                signature=Tuple[ObjPath,Array[Str]],
+                signature=Tuple[ObjPath, Array[Str]],
                 body=[export_path, ['test.interface.second']])
 
         # add second interface again
@@ -247,5 +247,5 @@ async def test_interface_add_remove_signal():
                 signal=await expected_signal,
                 export_path=export_path,
                 member='InterfacesRemoved',
-                signature=Tuple[ObjPath,Array[Str]],
+                signature=Tuple[ObjPath, Array[Str]],
                 body=[export_path, ['test.interface.first', 'test.interface.second']])
