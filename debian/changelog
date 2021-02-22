@@ -2,4 +2,4 @@ asyncdbus (0.4.0-1) smurf; urgency=low
 
   * source package automatically created by stdeb 0.9.1
 
- -- Matthias Urlichs <matthias@urlichs.de>  Mon, 22 Feb 2021 15:37:23 +0100
+ -- Matthias Urlichs <matthias@urlichs.de>  Mon, 22 Feb 2021 15:37:24 +0100
