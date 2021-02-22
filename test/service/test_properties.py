@@ -1,5 +1,5 @@
 from asyncdbus.service import ServiceInterface, dbus_property, method
-from asyncdbus import Message, MessageBus, ValueEvent, MessageType, PropertyAccess, ErrorType, Variant, DBusError
+from asyncdbus import Message, MessageBus, MessageType, PropertyAccess, ErrorType, Variant, DBusError
 
 import pytest
 import anyio
@@ -173,15 +173,19 @@ async def test_property_changed_signal():
 
         async def wait_for_message():
             # TODO timeout
-            future = ValueEvent()
+            evt = anyio.create_event()
+            sig = None
 
-            def message_handler(signal):
+            async def message_handler(signal):
+                nonlocal sig
                 if signal.interface == 'org.freedesktop.DBus.Properties':
                     bus2.remove_message_handler(message_handler)
-                    future.set(signal)
+                    sig = signal
+                    evt.set()
 
             bus2.add_message_handler(message_handler)
-            return await future
+            await evt.wait()
+            return sig
 
         bus2.send(
             Message(

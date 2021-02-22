@@ -685,9 +685,9 @@ class MessageBus:
         else:
             raise DBusError(ErrorType.INTERNAL_ERROR, 'invalid message type for method call', msg)
 
-    def _on_message(self, msg):
+    async def _on_message(self, msg):
         try:
-            self._process_message(msg)
+            await self._process_message(msg)
         except Exception as e:
             logging.error(
                 f'got unexpected error processing a message: {e}.\n{traceback.format_exc()}')
@@ -723,12 +723,14 @@ class MessageBus:
 
         return SendReply()
 
-    def _process_message(self, msg):
+    async def _process_message(self, msg):
         handled = False
 
         for handler in self._user_message_handlers:
             try:
                 result = handler(msg)
+                if inspect.iscoroutine(result):
+                    result = await result
                 if result:
                     if type(result) is Message:
                         self.send(result)
@@ -1261,7 +1263,7 @@ class MessageBus:
                 unmarshaller.feed(data, aux)
 
                 for msg in unmarshaller:
-                    self._on_message(msg)
+                    await self._on_message(msg)
 
     async def _message_writer(self, *, task_status):
         with anyio.open_cancel_scope() as sc:
