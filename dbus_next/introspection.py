@@ -28,6 +28,7 @@ class Arg:
         - :class:`InvalidSignatureError <asyncdbus.InvalidSignatureError>` - If the signature is not valid.
         - :class:`InvalidIntrospectionError <asyncdbus.InvalidIntrospectionError>` - If the signature is not a single complete type.
     """
+
     def __init__(self,
                  signature: Union[SignatureType, str],
                  direction: List[ArgDirection] = None,
@@ -100,6 +101,7 @@ class Signal:
     :raises:
         - :class:`InvalidMemberNameError <asyncdbus.InvalidMemberNameError>` - If the name of the signal is not a valid member name.
     """
+
     def __init__(self, name: str, args: List[Arg] = None):
         if name is not None:
             assert_member_name_valid(name)
@@ -163,6 +165,7 @@ class Method:
     :raises:
         - :class:`InvalidMemberNameError <asyncdbus.InvalidMemberNameError>` - If the name of this method is not valid.
     """
+
     def __init__(self, name: str, in_args: List[Arg] = [], out_args: List[Arg] = []):
         assert_member_name_valid(name)
 
@@ -235,9 +238,8 @@ class Property:
         - :class `InvalidSignatureError <asyncdbus.InvalidSignatureError>` - If the given signature is not valid.
         - :class: `InvalidMemberNameError <asyncdbus.InvalidMemberNameError>` - If the member name is not valid.
     """
-    def __init__(self,
-                 name: str,
-                 signature: str,
+
+    def __init__(self, name: str, signature: str,
                  access: PropertyAccess = PropertyAccess.READWRITE):
         assert_member_name_valid(name)
 
@@ -301,6 +303,7 @@ class Interface:
     :raises:
         - :class:`InvalidInterfaceNameError <asyncdbus.InvalidInterfaceNameError>` - If the name is not a valid interface name.
     """
+
     def __init__(self,
                  name: str,
                  methods: List[Method] = None,
@@ -384,6 +387,7 @@ class Node:
     :raises:
         - :class:`InvalidIntrospectionError <asyncdbus.InvalidIntrospectionError>` - If the name is not a valid node name.
     """
+
     def __init__(self, name: str = None, interfaces: List[Interface] = None, is_root: bool = True):
         if not is_root and not name:
             raise InvalidIntrospectionError('child nodes must have a "name" attribute')
@@ -486,67 +490,73 @@ class Node:
         * ``org.freedesktop.DBus.Properties``
         * ``org.freedesktop.DBus.ObjectManager``
         """
-        return Node(name,
-                    is_root=True,
-                    interfaces=[
-                        Interface('org.freedesktop.DBus.Introspectable',
-                                  methods=[
-                                      Method('Introspect',
-                                             out_args=[Arg('s', ArgDirection.OUT, 'data')])
-                                  ]),
-                        Interface('org.freedesktop.DBus.Peer',
-                                  methods=[
-                                      Method('GetMachineId',
-                                             out_args=[Arg('s', ArgDirection.OUT, 'machine_uuid')]),
-                                      Method('Ping')
-                                  ]),
-                        Interface('org.freedesktop.DBus.Properties',
-                                  methods=[
-                                      Method('Get',
-                                             in_args=[
-                                                 Arg('s', ArgDirection.IN, 'interface_name'),
-                                                 Arg('s', ArgDirection.IN, 'property_name')
-                                             ],
-                                             out_args=[Arg('v', ArgDirection.OUT, 'value')]),
-                                      Method('Set',
-                                             in_args=[
-                                                 Arg('s', ArgDirection.IN, 'interface_name'),
-                                                 Arg('s', ArgDirection.IN, 'property_name'),
-                                                 Arg('v', ArgDirection.IN, 'value')
-                                             ]),
-                                      Method('GetAll',
-                                             in_args=[Arg('s', ArgDirection.IN, 'interface_name')],
-                                             out_args=[Arg('a{sv}', ArgDirection.OUT, 'props')])
-                                  ],
-                                  signals=[
-                                      Signal('PropertiesChanged',
-                                             args=[
-                                                 Arg('s', ArgDirection.OUT, 'interface_name'),
-                                                 Arg('a{sv}', ArgDirection.OUT,
-                                                     'changed_properties'),
-                                                 Arg('as', ArgDirection.OUT,
-                                                     'invalidated_properties')
-                                             ])
-                                  ]),
-                        Interface('org.freedesktop.DBus.ObjectManager',
-                                  methods=[
-                                      Method('GetManagedObjects',
-                                             out_args=[
-                                                 Arg('a{oa{sa{sv}}}', ArgDirection.OUT,
-                                                     'objpath_interfaces_and_properties')
-                                             ]),
-                                  ],
-                                  signals=[
-                                      Signal('InterfacesAdded',
-                                             args=[
-                                                 Arg('o', ArgDirection.OUT, 'object_path'),
-                                                 Arg('a{sa{sv}}', ArgDirection.OUT,
-                                                     'interfaces_and_properties'),
-                                             ]),
-                                      Signal('InterfacesRemoved',
-                                             args=[
-                                                 Arg('o', ArgDirection.OUT, 'object_path'),
-                                                 Arg('as', ArgDirection.OUT, 'interfaces'),
-                                             ])
-                                  ]),
-                    ])
+        return Node(
+            name,
+            is_root=True,
+            interfaces=[
+                Interface(
+                    'org.freedesktop.DBus.Introspectable',
+                    methods=[Method('Introspect', out_args=[Arg('s', ArgDirection.OUT, 'data')])]),
+                Interface(
+                    'org.freedesktop.DBus.Peer',
+                    methods=[
+                        Method(
+                            'GetMachineId', out_args=[Arg('s', ArgDirection.OUT, 'machine_uuid')]),
+                        Method('Ping')
+                    ]),
+                Interface(
+                    'org.freedesktop.DBus.Properties',
+                    methods=[
+                        Method(
+                            'Get',
+                            in_args=[
+                                Arg('s', ArgDirection.IN, 'interface_name'),
+                                Arg('s', ArgDirection.IN, 'property_name')
+                            ],
+                            out_args=[Arg('v', ArgDirection.OUT, 'value')]),
+                        Method(
+                            'Set',
+                            in_args=[
+                                Arg('s', ArgDirection.IN, 'interface_name'),
+                                Arg('s', ArgDirection.IN, 'property_name'),
+                                Arg('v', ArgDirection.IN, 'value')
+                            ]),
+                        Method(
+                            'GetAll',
+                            in_args=[Arg('s', ArgDirection.IN, 'interface_name')],
+                            out_args=[Arg('a{sv}', ArgDirection.OUT, 'props')])
+                    ],
+                    signals=[
+                        Signal(
+                            'PropertiesChanged',
+                            args=[
+                                Arg('s', ArgDirection.OUT, 'interface_name'),
+                                Arg('a{sv}', ArgDirection.OUT, 'changed_properties'),
+                                Arg('as', ArgDirection.OUT, 'invalidated_properties')
+                            ])
+                    ]),
+                Interface(
+                    'org.freedesktop.DBus.ObjectManager',
+                    methods=[
+                        Method(
+                            'GetManagedObjects',
+                            out_args=[
+                                Arg('a{oa{sa{sv}}}', ArgDirection.OUT,
+                                    'objpath_interfaces_and_properties')
+                            ]),
+                    ],
+                    signals=[
+                        Signal(
+                            'InterfacesAdded',
+                            args=[
+                                Arg('o', ArgDirection.OUT, 'object_path'),
+                                Arg('a{sa{sv}}', ArgDirection.OUT, 'interfaces_and_properties'),
+                            ]),
+                        Signal(
+                            'InterfacesRemoved',
+                            args=[
+                                Arg('o', ArgDirection.OUT, 'object_path'),
+                                Arg('as', ArgDirection.OUT, 'interfaces'),
+                            ])
+                    ]),
+            ])

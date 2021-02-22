@@ -99,15 +99,16 @@ class AsyncInterface(ServiceInterface):
 @pytest.mark.parametrize('interface_class', [ExampleInterface, AsyncInterface])
 @pytest.mark.anyio
 async def test_methods(interface_class):
-  async with MessageBus().connect() as bus1, \
-          MessageBus().connect() as bus2:
+    async with MessageBus().connect() as bus1, \
+            MessageBus().connect() as bus2:
 
-    interface = interface_class('test.interface')
-    export_path = '/test/path'
+        interface = interface_class('test.interface')
+        export_path = '/test/path'
 
-    async def call(member, signature='', body=[], flags=MessageFlag.NONE):
-        return await bus2.call(
-            Message(destination=bus1.unique_name,
+        async def call(member, signature='', body=[], flags=MessageFlag.NONE):
+            return await bus2.call(
+                Message(
+                    destination=bus1.unique_name,
                     path=export_path,
                     interface=interface.name,
                     member=member,
@@ -115,51 +116,51 @@ async def test_methods(interface_class):
                     body=body,
                     flags=flags))
 
-    bus1.export(export_path, interface)
+        bus1.export(export_path, interface)
 
-    body = ['hello world']
-    reply = await call('echo', 's', body)
+        body = ['hello world']
+        reply = await call('echo', 's', body)
 
-    assert reply.message_type == MessageType.METHOD_RETURN, reply.body[0]
-    assert reply.signature == 's'
-    assert reply.body == body
+        assert reply.message_type == MessageType.METHOD_RETURN, reply.body[0]
+        assert reply.signature == 's'
+        assert reply.body == body
 
-    body = ['hello', 'world']
-    reply = await call('echo_multiple', 'ss', body)
-    assert reply.message_type == MessageType.METHOD_RETURN, reply.body[0]
-    assert reply.signature == 'ss'
-    assert reply.body == body
+        body = ['hello', 'world']
+        reply = await call('echo_multiple', 'ss', body)
+        assert reply.message_type == MessageType.METHOD_RETURN, reply.body[0]
+        assert reply.signature == 'ss'
+        assert reply.body == body
 
-    body = [['hello', 'world'],
-            Variant('v', Variant('(ss)', ['hello', 'world'])), {
-                'foo': Variant('t', 100)
-            }, ['one', ['two', [Variant('s', 'three')]]]]
-    signature = 'asva{sv}(s(s(v)))'
-    SignatureTree(signature).verify(body)
-    reply = await call('echo_containers', signature, body)
-    assert reply.message_type == MessageType.METHOD_RETURN, reply.body[0]
-    assert reply.signature == signature
-    assert reply.body == body
+        body = [['hello', 'world'],
+                Variant('v', Variant('(ss)', ['hello', 'world'])), {
+                    'foo': Variant('t', 100)
+                }, ['one', ['two', [Variant('s', 'three')]]]]
+        signature = 'asva{sv}(s(s(v)))'
+        SignatureTree(signature).verify(body)
+        reply = await call('echo_containers', signature, body)
+        assert reply.message_type == MessageType.METHOD_RETURN, reply.body[0]
+        assert reply.signature == signature
+        assert reply.body == body
 
-    reply = await call('ping')
-    assert reply.message_type == MessageType.METHOD_RETURN, reply.body[0]
-    assert reply.signature == ''
-    assert reply.body == []
+        reply = await call('ping')
+        assert reply.message_type == MessageType.METHOD_RETURN, reply.body[0]
+        assert reply.signature == ''
+        assert reply.body == []
 
-    reply = await call('throws_unexpected_error')
-    assert reply.message_type == MessageType.ERROR, reply.body[0]
-    assert reply.error_name == ErrorType.SERVICE_ERROR.value, reply.body[0]
+        reply = await call('throws_unexpected_error')
+        assert reply.message_type == MessageType.ERROR, reply.body[0]
+        assert reply.error_name == ErrorType.SERVICE_ERROR.value, reply.body[0]
 
-    reply = await call('throws_dbus_error')
-    assert reply.message_type == MessageType.ERROR, reply.body[0]
-    assert reply.error_name == 'test.error', reply.body[0]
-    assert reply.body == ['an error ocurred']
+        reply = await call('throws_dbus_error')
+        assert reply.message_type == MessageType.ERROR, reply.body[0]
+        assert reply.error_name == 'test.error', reply.body[0]
+        assert reply.body == ['an error ocurred']
 
-    reply = await call('ping', flags=MessageFlag.NO_REPLY_EXPECTED)
-    assert reply is None
+        reply = await call('ping', flags=MessageFlag.NO_REPLY_EXPECTED)
+        assert reply is None
 
-    reply = await call('throws_unexpected_error', flags=MessageFlag.NO_REPLY_EXPECTED)
-    assert reply is None
+        reply = await call('throws_unexpected_error', flags=MessageFlag.NO_REPLY_EXPECTED)
+        assert reply is None
 
-    reply = await call('throws_dbus_error', flags=MessageFlag.NO_REPLY_EXPECTED)
-    assert reply is None
+        reply = await call('throws_dbus_error', flags=MessageFlag.NO_REPLY_EXPECTED)
+        assert reply is None

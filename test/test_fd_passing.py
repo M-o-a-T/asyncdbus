@@ -68,58 +68,60 @@ def assert_fds_equal(fd1, fd2):
 
 @pytest.mark.anyio
 async def test_sending_file_descriptor_low_level():
-  async with MessageBus(negotiate_unix_fd=True).connect() as bus1, \
-          MessageBus(negotiate_unix_fd=True).connect() as bus2:
+    async with MessageBus(negotiate_unix_fd=True).connect() as bus1, \
+            MessageBus(negotiate_unix_fd=True).connect() as bus2:
 
-    fd_before = open_file()
-    fd_after = None
+        fd_before = open_file()
+        fd_after = None
 
-    msg = Message(destination=bus1.unique_name,
-                  path='/org/test/path',
-                  interface='org.test.iface',
-                  member='SomeMember',
-                  body=[0],
-                  signature='h',
-                  unix_fds=[fd_before])
+        msg = Message(
+            destination=bus1.unique_name,
+            path='/org/test/path',
+            interface='org.test.iface',
+            member='SomeMember',
+            body=[0],
+            signature='h',
+            unix_fds=[fd_before])
 
-    def message_handler(sent):
-        nonlocal fd_after
-        if sent.sender == bus2.unique_name and sent.serial == msg.serial:
-            assert sent.path == msg.path
-            assert sent.serial == msg.serial
-            assert sent.interface == msg.interface
-            assert sent.member == msg.member
-            assert sent.body == [0]
-            assert len(sent.unix_fds) == 1
-            fd_after = sent.unix_fds[0]
-            bus1.send(Message.new_method_return(sent, 's', ['got it']))
-            bus1.remove_message_handler(message_handler)
-            return True
+        def message_handler(sent):
+            nonlocal fd_after
+            if sent.sender == bus2.unique_name and sent.serial == msg.serial:
+                assert sent.path == msg.path
+                assert sent.serial == msg.serial
+                assert sent.interface == msg.interface
+                assert sent.member == msg.member
+                assert sent.body == [0]
+                assert len(sent.unix_fds) == 1
+                fd_after = sent.unix_fds[0]
+                bus1.send(Message.new_method_return(sent, 's', ['got it']))
+                bus1.remove_message_handler(message_handler)
+                return True
 
-    bus1.add_message_handler(message_handler)
+        bus1.add_message_handler(message_handler)
 
-    reply = await bus2.call(msg)
-    assert reply.body == ['got it']
-    assert fd_after is not None
+        reply = await bus2.call(msg)
+        assert reply.body == ['got it']
+        assert fd_after is not None
 
-    assert_fds_equal(fd_before, fd_after)
+        assert_fds_equal(fd_before, fd_after)
 
-    for fd in [fd_before, fd_after]:
-        os.close(fd)
+        for fd in [fd_before, fd_after]:
+            os.close(fd)
 
 
 @pytest.mark.anyio
 async def test_high_level_service_fd_passing():
-  async with MessageBus(negotiate_unix_fd=True).connect() as bus1, \
-          MessageBus(negotiate_unix_fd=True).connect() as bus2:
+    async with MessageBus(negotiate_unix_fd=True).connect() as bus1, \
+            MessageBus(negotiate_unix_fd=True).connect() as bus2:
 
-    interface_name = 'test.interface'
-    interface = ExampleInterface(interface_name)
-    export_path = '/test/path'
+        interface_name = 'test.interface'
+        interface = ExampleInterface(interface_name)
+        export_path = '/test/path'
 
-    async def call(member, signature='', body=[], unix_fds=[], iface=interface.name):
-        return await bus2.call(
-            Message(destination=bus1.unique_name,
+        async def call(member, signature='', body=[], unix_fds=[], iface=interface.name):
+            return await bus2.call(
+                Message(
+                    destination=bus1.unique_name,
                     path=export_path,
                     interface=iface,
                     member=member,
@@ -127,138 +129,139 @@ async def test_high_level_service_fd_passing():
                     body=body,
                     unix_fds=unix_fds))
 
-    bus1.export(export_path, interface)
+        bus1.export(export_path, interface)
 
-    # test that an fd can be returned by the service
-    reply = await call('ReturnsFd')
-    assert reply.message_type == MessageType.METHOD_RETURN, reply.body
-    assert reply.signature == 'h'
-    assert len(reply.unix_fds) == 1
-    assert_fds_equal(interface.get_last_fd(), reply.unix_fds[0])
-    interface.cleanup()
-    os.close(reply.unix_fds[0])
+        # test that an fd can be returned by the service
+        reply = await call('ReturnsFd')
+        assert reply.message_type == MessageType.METHOD_RETURN, reply.body
+        assert reply.signature == 'h'
+        assert len(reply.unix_fds) == 1
+        assert_fds_equal(interface.get_last_fd(), reply.unix_fds[0])
+        interface.cleanup()
+        os.close(reply.unix_fds[0])
 
-    # test that an fd can be sent to the service
-    fd = open_file()
-    reply = await call('AcceptsFd', signature='h', body=[0], unix_fds=[fd])
-    assert reply.message_type == MessageType.METHOD_RETURN, reply.body
-    assert_fds_equal(interface.get_last_fd(), fd)
+        # test that an fd can be sent to the service
+        fd = open_file()
+        reply = await call('AcceptsFd', signature='h', body=[0], unix_fds=[fd])
+        assert reply.message_type == MessageType.METHOD_RETURN, reply.body
+        assert_fds_equal(interface.get_last_fd(), fd)
 
-    interface.cleanup()
-    os.close(fd)
+        interface.cleanup()
+        os.close(fd)
 
-    # signals
-    fut = ValueEvent()
+        # signals
+        fut = ValueEvent()
 
-    def fd_listener(msg):
-        if msg.sender == bus1.unique_name and msg.message_type == MessageType.SIGNAL:
-            fut.set_result(msg)
+        def fd_listener(msg):
+            if msg.sender == bus1.unique_name and msg.message_type == MessageType.SIGNAL:
+                fut.set_result(msg)
 
-    reply = await bus2.call(
-        Message(destination='org.freedesktop.DBus',
+        reply = await bus2.call(
+            Message(
+                destination='org.freedesktop.DBus',
                 path='/org/freedesktop/DBus',
                 member='AddMatch',
                 signature='s',
                 body=[f"sender='{bus1.unique_name}'"]))
-    assert reply.message_type == MessageType.METHOD_RETURN
+        assert reply.message_type == MessageType.METHOD_RETURN
 
-    bus2.add_message_handler(fd_listener)
-    interface.SignalFd()
-    reply = await fut
+        bus2.add_message_handler(fd_listener)
+        interface.SignalFd()
+        reply = await fut
 
-    assert len(reply.unix_fds) == 1, (reply.unix_fds,interface.get_last_fd())
-    assert reply.body == [0]
-    assert_fds_equal(reply.unix_fds[0], interface.get_last_fd())
+        assert len(reply.unix_fds) == 1, (reply.unix_fds, interface.get_last_fd())
+        assert reply.body == [0]
+        assert_fds_equal(reply.unix_fds[0], interface.get_last_fd())
 
-    interface.cleanup()
-    os.close(reply.unix_fds[0])
+        interface.cleanup()
+        os.close(reply.unix_fds[0])
 
-    # properties
-    reply = await call('Get',
-                       'ss', [interface_name, 'PropFd'],
-                       iface='org.freedesktop.DBus.Properties')
-    assert reply.message_type == MessageType.METHOD_RETURN, reply.body
-    assert reply.body[0].signature == 'h'
-    assert reply.body[0].value == 0
-    assert len(reply.unix_fds) == 1
-    assert_fds_equal(interface.get_last_fd(), reply.unix_fds[0])
-    interface.cleanup()
-    os.close(reply.unix_fds[0])
+        # properties
+        reply = await call(
+            'Get', 'ss', [interface_name, 'PropFd'], iface='org.freedesktop.DBus.Properties')
+        assert reply.message_type == MessageType.METHOD_RETURN, reply.body
+        assert reply.body[0].signature == 'h'
+        assert reply.body[0].value == 0
+        assert len(reply.unix_fds) == 1
+        assert_fds_equal(interface.get_last_fd(), reply.unix_fds[0])
+        interface.cleanup()
+        os.close(reply.unix_fds[0])
 
-    fd = open_file()
-    reply = await call('Set',
-                       'ssv', [interface_name, 'PropFd', Variant('h', 0)],
-                       iface='org.freedesktop.DBus.Properties',
-                       unix_fds=[fd])
-    assert reply.message_type == MessageType.METHOD_RETURN, reply.body
-    assert_fds_equal(interface.get_last_fd(), fd)
-    interface.cleanup()
-    os.close(fd)
+        fd = open_file()
+        reply = await call(
+            'Set',
+            'ssv', [interface_name, 'PropFd', Variant('h', 0)],
+            iface='org.freedesktop.DBus.Properties',
+            unix_fds=[fd])
+        assert reply.message_type == MessageType.METHOD_RETURN, reply.body
+        assert_fds_equal(interface.get_last_fd(), fd)
+        interface.cleanup()
+        os.close(fd)
 
-    reply = await call('GetAll', 's', [interface_name], iface='org.freedesktop.DBus.Properties')
-    assert reply.message_type == MessageType.METHOD_RETURN, reply.body
-    assert reply.body[0]['PropFd'].signature == 'h'
-    assert reply.body[0]['PropFd'].value == 0
-    assert len(reply.unix_fds) == 1
-    assert_fds_equal(interface.get_last_fd(), reply.unix_fds[0])
-    interface.cleanup()
-    os.close(reply.unix_fds[0])
+        reply = await call('GetAll', 's', [interface_name], iface='org.freedesktop.DBus.Properties')
+        assert reply.message_type == MessageType.METHOD_RETURN, reply.body
+        assert reply.body[0]['PropFd'].signature == 'h'
+        assert reply.body[0]['PropFd'].value == 0
+        assert len(reply.unix_fds) == 1
+        assert_fds_equal(interface.get_last_fd(), reply.unix_fds[0])
+        interface.cleanup()
+        os.close(reply.unix_fds[0])
 
 
 @pytest.mark.anyio
 async def test_sending_file_descriptor_with_proxy():
-  name = 'dbus.next.test.service'
-  path = '/test/path'
-  interface_name = 'test.interface'
+    name = 'dbus.next.test.service'
+    path = '/test/path'
+    interface_name = 'test.interface'
 
-  async with MessageBus(negotiate_unix_fd=True).connect() as bus:
+    async with MessageBus(negotiate_unix_fd=True).connect() as bus:
 
-    interface = ExampleInterface(interface_name)
-    bus.export(path, interface)
-    await bus.request_name(name)
+        interface = ExampleInterface(interface_name)
+        bus.export(path, interface)
+        await bus.request_name(name)
 
-    intr = await bus.introspect(name, path)
+        intr = await bus.introspect(name, path)
 
-    proxy = bus.get_proxy_object(name, path, intr)
-    proxy_interface = proxy.get_interface(interface_name)
+        proxy = bus.get_proxy_object(name, path, intr)
+        proxy_interface = proxy.get_interface(interface_name)
 
-    # test fds are replaced correctly in all high level interfaces
-    fd = await proxy_interface.call_returns_fd()
-    assert_fds_equal(interface.get_last_fd(), fd)
-    interface.cleanup()
-    os.close(fd)
+        # test fds are replaced correctly in all high level interfaces
+        fd = await proxy_interface.call_returns_fd()
+        assert_fds_equal(interface.get_last_fd(), fd)
+        interface.cleanup()
+        os.close(fd)
 
-    fd = open_file()
-    await proxy_interface.call_accepts_fd(fd)
-    assert_fds_equal(interface.get_last_fd(), fd)
-    interface.cleanup()
-    os.close(fd)
+        fd = open_file()
+        await proxy_interface.call_accepts_fd(fd)
+        assert_fds_equal(interface.get_last_fd(), fd)
+        interface.cleanup()
+        os.close(fd)
 
-    fd = await proxy_interface.get_prop_fd()
-    assert_fds_equal(interface.get_last_fd(), fd)
-    interface.cleanup()
-    os.close(fd)
+        fd = await proxy_interface.get_prop_fd()
+        assert_fds_equal(interface.get_last_fd(), fd)
+        interface.cleanup()
+        os.close(fd)
 
-    fd = open_file()
-    await proxy_interface.set_prop_fd(fd)
-    assert_fds_equal(interface.get_last_fd(), fd)
-    interface.cleanup()
-    os.close(fd)
+        fd = open_file()
+        await proxy_interface.set_prop_fd(fd)
+        assert_fds_equal(interface.get_last_fd(), fd)
+        interface.cleanup()
+        os.close(fd)
 
-    fut = ValueEvent()
+        fut = ValueEvent()
 
-    def on_signal_fd(fd):
-        fut.set_result(fd)
-        proxy_interface.off_signal_fd(on_signal_fd)
+        def on_signal_fd(fd):
+            fut.set_result(fd)
+            proxy_interface.off_signal_fd(on_signal_fd)
 
-    proxy_interface.on_signal_fd(on_signal_fd)
-    await anyio.sleep(0.1)  # TODO we have a timing problem here
-    interface.SignalFd()
-    fd = await fut
-    assert_fds_equal(interface.get_last_fd(), fd)
-    interface.cleanup()
-    os.close(fd)
-    pass # closing
+        proxy_interface.on_signal_fd(on_signal_fd)
+        await anyio.sleep(0.1)  # TODO we have a timing problem here
+        interface.SignalFd()
+        fd = await fut
+        assert_fds_equal(interface.get_last_fd(), fd)
+        interface.cleanup()
+        os.close(fd)
+        pass  # closing
 
 
 @pytest.mark.anyio
@@ -275,7 +278,9 @@ async def test_sending_file_descriptor_with_proxy():
         pytest.param([[7, "foo"], [8, "bar"]],
                      'a(hs)', ([[[0, "foo"], [1, "bar"]]], [7, 8]),
                      id='Signature: "a(hs)"'),
-        pytest.param({"foo": 3}, 'a{sh}', ([{
+        pytest.param({
+            "foo": 3
+        }, 'a{sh}', ([{
             "foo": 0
         }], [3]), id='Signature: "a{sh}"'),
         pytest.param({
@@ -288,10 +293,14 @@ async def test_sending_file_descriptor_with_proxy():
                      }], [3, 6]),
                      id='Signature: "a{sh}"'),
         pytest.param(
-            {"foo": [3, 8]}, 'a{sah}', ([{
+            {
+                "foo": [3, 8]
+            }, 'a{sah}', ([{
                 "foo": [0, 1]
             }], [3, 8]), id='Signature: "a{sah}"'),
-        pytest.param({'foo': Variant('t', 100)},
+        pytest.param({
+            'foo': Variant('t', 100)
+        },
                      'a{sv}', ([{
                          'foo': Variant('t', 100)
                      }], []),
@@ -300,28 +309,32 @@ async def test_sending_file_descriptor_with_proxy():
                      '(s(s(v)))', ([['one', ['two', [Variant('s', 'three')]]]], []),
                      id='Signature: "(s(s(v)))"'),
         pytest.param(Variant('h', 2), 'v', ([Variant('h', 0)], [2]), id='Variant with: "h"'),
-        pytest.param(Variant('(hh)', [2, 8]),
-                     'v', ([Variant('(hh)', [0, 1])], [2, 8]),
-                     id='Variant with: "(hh)"'),
+        pytest.param(
+            Variant('(hh)', [2, 8]),
+            'v', ([Variant('(hh)', [0, 1])], [2, 8]),
+            id='Variant with: "(hh)"'),
         pytest.param(
             Variant('ah', [2, 4]), 'v', ([Variant('ah', [0, 1])], [2, 4]), id='Variant with: "ah"'),
-        pytest.param(Variant('(ss)', ['hello', 'world']),
-                     'v', ([Variant('(ss)', ['hello', 'world'])], []),
-                     id='Variant with: "(ss)"'),
-        pytest.param(Variant('v', Variant('t', 100)),
-                     'v', ([Variant('v', Variant('t', 100))], []),
-                     id='Variant with: "v"'),
-        pytest.param([
-            Variant('v', Variant('(ss)', ['hello', 'world'])), {
-                'foo': Variant('t', 100)
-            }, ['one', ['two', [Variant('s', 'three')]]]
-        ],
-                     'va{sv}(s(s(v)))', ([
-                         Variant('v', Variant('(ss)', ['hello', 'world'])), {
-                             'foo': Variant('t', 100)
-                         }, ['one', ['two', [Variant('s', 'three')]]]
-                     ], []),
-                     id='Variant with: "va{sv}(s(s(v)))"'),
+        pytest.param(
+            Variant('(ss)', ['hello', 'world']),
+            'v', ([Variant('(ss)', ['hello', 'world'])], []),
+            id='Variant with: "(ss)"'),
+        pytest.param(
+            Variant('v', Variant('t', 100)),
+            'v', ([Variant('v', Variant('t', 100))], []),
+            id='Variant with: "v"'),
+        pytest.param(
+            [
+                Variant('v', Variant('(ss)', ['hello', 'world'])), {
+                    'foo': Variant('t', 100)
+                }, ['one', ['two', [Variant('s', 'three')]]]
+            ],
+            'va{sv}(s(s(v)))', ([
+                Variant('v', Variant('(ss)', ['hello', 'world'])), {
+                    'foo': Variant('t', 100)
+                }, ['one', ['two', [Variant('s', 'three')]]]
+            ], []),
+            id='Variant with: "va{sv}(s(s(v)))"'),
     ],
 )
 async def test_fn_result_to_body(result, out_signature, expected):

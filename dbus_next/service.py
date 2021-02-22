@@ -318,6 +318,7 @@ class ServiceInterface:
         valid interface name.
     :vartype name: str
     """
+
     def __init__(self, name: str):
         # TODO cannot be overridden by a dbus member
         self.name = name
@@ -390,22 +391,20 @@ class ServiceInterface:
         :rtype: :class:`asyncdbus.introspection.Interface`
         """
         # TODO cannot be overridden by a dbus member
-        return intr.Interface(self.name,
-                              methods=[
-                                  method.introspection
-                                  for method in ServiceInterface._get_methods(self)
-                                  if not method.disabled
-                              ],
-                              signals=[
-                                  signal.introspection
-                                  for signal in ServiceInterface._get_signals(self)
-                                  if not signal.disabled
-                              ],
-                              properties=[
-                                  prop.introspection
-                                  for prop in ServiceInterface._get_properties(self)
-                                  if not prop.disabled
-                              ])
+        return intr.Interface(
+            self.name,
+            methods=[
+                method.introspection for method in ServiceInterface._get_methods(self)
+                if not method.disabled
+            ],
+            signals=[
+                signal.introspection for signal in ServiceInterface._get_signals(self)
+                if not signal.disabled
+            ],
+            properties=[
+                prop.introspection for prop in ServiceInterface._get_properties(self)
+                if not prop.disabled
+            ])
 
     @staticmethod
     def _add_bus(interface, bus):

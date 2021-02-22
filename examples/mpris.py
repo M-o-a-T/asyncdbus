@@ -12,10 +12,11 @@ async def main():
     async with MessageBus().connect() as bus:
         # the introspection xml would normally be included in your project, but
         # this is convenient for development
-        introspection = await bus.introspect('org.mpris.MediaPlayer2.vlc', '/org/mpris/MediaPlayer2')
+        introspection = await bus.introspect('org.mpris.MediaPlayer2.vlc',
+                                             '/org/mpris/MediaPlayer2')
 
         obj = bus.get_proxy_object('org.mpris.MediaPlayer2.vlc', '/org/mpris/MediaPlayer2',
-                                introspection)
+                                   introspection)
         player = obj.get_interface('org.mpris.MediaPlayer2.Player')
         properties = obj.get_interface('org.freedesktop.DBus.Properties')
 

@@ -67,130 +67,135 @@ class ExampleInterface(ServiceInterface):
 
 @pytest.mark.anyio
 async def test_property_methods():
-  async with MessageBus().connect() as bus1, \
-          MessageBus().connect() as bus2:
+    async with MessageBus().connect() as bus1, \
+            MessageBus().connect() as bus2:
 
-    interface = ExampleInterface('test.interface')
-    export_path = '/test/path'
-    bus1.export(export_path, interface)
+        interface = ExampleInterface('test.interface')
+        export_path = '/test/path'
+        bus1.export(export_path, interface)
 
-    async def call_properties(member, signature, body):
-        return await bus2.call(
-            Message(destination=bus1.unique_name,
+        async def call_properties(member, signature, body):
+            return await bus2.call(
+                Message(
+                    destination=bus1.unique_name,
                     path=export_path,
                     interface='org.freedesktop.DBus.Properties',
                     member=member,
                     signature=signature,
                     body=body))
 
-    result = await call_properties('GetAll', 's', [interface.name])
-    assert result.message_type == MessageType.METHOD_RETURN, result.body[0]
-    assert result.signature == 'a{sv}'
-    assert result.body == [{
-        'string_prop': Variant('s', interface._string_prop),
-        'readonly_prop': Variant('t', interface._readonly_prop),
-        'container_prop': Variant('a(ss)', interface._container_prop),
-        'renamed_prop': Variant('s', interface._renamed_prop)
-    }]
+        result = await call_properties('GetAll', 's', [interface.name])
+        assert result.message_type == MessageType.METHOD_RETURN, result.body[0]
+        assert result.signature == 'a{sv}'
+        assert result.body == [{
+            'string_prop': Variant('s', interface._string_prop),
+            'readonly_prop': Variant('t', interface._readonly_prop),
+            'container_prop': Variant('a(ss)', interface._container_prop),
+            'renamed_prop': Variant('s', interface._renamed_prop)
+        }]
 
-    result = await call_properties('Get', 'ss', [interface.name, 'string_prop'])
-    assert result.message_type == MessageType.METHOD_RETURN, result.body[0]
-    assert result.signature == 'v'
-    assert result.body == [Variant('s', 'hi')]
+        result = await call_properties('Get', 'ss', [interface.name, 'string_prop'])
+        assert result.message_type == MessageType.METHOD_RETURN, result.body[0]
+        assert result.signature == 'v'
+        assert result.body == [Variant('s', 'hi')]
 
-    result = await call_properties(
-        'Set', 'ssv',
-        [interface.name, 'string_prop', Variant('s', 'ho')])
-    assert result.message_type == MessageType.METHOD_RETURN, result.body[0]
-    assert interface.string_prop == 'ho'
+        result = await call_properties(
+            'Set', 'ssv',
+            [interface.name, 'string_prop', Variant('s', 'ho')])
+        assert result.message_type == MessageType.METHOD_RETURN, result.body[0]
+        assert interface.string_prop == 'ho'
 
-    result = await call_properties(
-        'Set', 'ssv',
-        [interface.name, 'readonly_prop', Variant('t', 100)])
-    assert result.message_type == MessageType.ERROR, result.body[0]
-    assert result.error_name == ErrorType.PROPERTY_READ_ONLY.value, result.body[0]
+        result = await call_properties(
+            'Set', 'ssv',
+            [interface.name, 'readonly_prop', Variant('t', 100)])
+        assert result.message_type == MessageType.ERROR, result.body[0]
+        assert result.error_name == ErrorType.PROPERTY_READ_ONLY.value, result.body[0]
 
-    result = await call_properties(
-        'Set', 'ssv',
-        [interface.name, 'disabled_prop', Variant('s', 'asdf')])
-    assert result.message_type == MessageType.ERROR, result.body[0]
-    assert result.error_name == ErrorType.UNKNOWN_PROPERTY.value
+        result = await call_properties(
+            'Set', 'ssv',
+            [interface.name, 'disabled_prop', Variant('s', 'asdf')])
+        assert result.message_type == MessageType.ERROR, result.body[0]
+        assert result.error_name == ErrorType.UNKNOWN_PROPERTY.value
 
-    result = await call_properties(
-        'Set', 'ssv',
-        [interface.name, 'not_a_prop', Variant('s', 'asdf')])
-    assert result.message_type == MessageType.ERROR, result.body[0]
-    assert result.error_name == ErrorType.UNKNOWN_PROPERTY.value
+        result = await call_properties(
+            'Set', 'ssv',
+            [interface.name, 'not_a_prop', Variant('s', 'asdf')])
+        assert result.message_type == MessageType.ERROR, result.body[0]
+        assert result.error_name == ErrorType.UNKNOWN_PROPERTY.value
 
-    # wrong type
-    result = await call_properties('Set', 'ssv', [interface.name, 'string_prop', Variant('t', 100)])
-    assert result.message_type == MessageType.ERROR
-    assert result.error_name == ErrorType.INVALID_SIGNATURE.value
+        # wrong type
+        result = await call_properties(
+            'Set', 'ssv',
+            [interface.name, 'string_prop', Variant('t', 100)])
+        assert result.message_type == MessageType.ERROR
+        assert result.error_name == ErrorType.INVALID_SIGNATURE.value
 
-    # enable the erroring property so we can test it
-    for prop in ServiceInterface._get_properties(interface):
-        if prop.name == 'throws_error':
-            prop.disabled = False
+        # enable the erroring property so we can test it
+        for prop in ServiceInterface._get_properties(interface):
+            if prop.name == 'throws_error':
+                prop.disabled = False
 
-    result = await call_properties(
-        'Set', 'ssv',
-        [interface.name, 'throws_error', Variant('s', 'ho')])
-    assert result.message_type == MessageType.ERROR, result.body[0]
-    assert result.error_name == 'test.error'
-    assert result.body == ['told you so']
+        result = await call_properties(
+            'Set', 'ssv',
+            [interface.name, 'throws_error', Variant('s', 'ho')])
+        assert result.message_type == MessageType.ERROR, result.body[0]
+        assert result.error_name == 'test.error'
+        assert result.body == ['told you so']
 
-    result = await call_properties('Get', 'ss', [interface.name, 'throws_error'])
-    assert result.message_type == MessageType.ERROR, result.body[0]
-    assert result.error_name == 'test.error'
-    assert result.body == ['told you so']
+        result = await call_properties('Get', 'ss', [interface.name, 'throws_error'])
+        assert result.message_type == MessageType.ERROR, result.body[0]
+        assert result.error_name == 'test.error'
+        assert result.body == ['told you so']
 
-    result = await call_properties('GetAll', 's', [interface.name])
-    assert result.message_type == MessageType.ERROR, result.body[0]
-    assert result.error_name == 'test.error'
-    assert result.body == ['told you so']
+        result = await call_properties('GetAll', 's', [interface.name])
+        assert result.message_type == MessageType.ERROR, result.body[0]
+        assert result.error_name == 'test.error'
+        assert result.body == ['told you so']
 
 
 @pytest.mark.anyio
 async def test_property_changed_signal():
-  async with MessageBus().connect() as bus1, \
-          MessageBus().connect() as bus2:
+    async with MessageBus().connect() as bus1, \
+            MessageBus().connect() as bus2:
 
-    await bus2.call(
-        Message(destination='org.freedesktop.DBus',
+        await bus2.call(
+            Message(
+                destination='org.freedesktop.DBus',
                 path='/org/freedesktop/DBus',
                 interface='org.freedesktop.DBus',
                 member='AddMatch',
                 signature='s',
                 body=[f'sender={bus1.unique_name}']))
 
-    interface = ExampleInterface('test.interface')
-    export_path = '/test/path'
-    bus1.export(export_path, interface)
+        interface = ExampleInterface('test.interface')
+        export_path = '/test/path'
+        bus1.export(export_path, interface)
 
-    async def wait_for_message():
-        # TODO timeout
-        future = ValueEvent()
+        async def wait_for_message():
+            # TODO timeout
+            future = ValueEvent()
 
-        def message_handler(signal):
-            if signal.interface == 'org.freedesktop.DBus.Properties':
-                bus2.remove_message_handler(message_handler)
-                future.set(signal)
+            def message_handler(signal):
+                if signal.interface == 'org.freedesktop.DBus.Properties':
+                    bus2.remove_message_handler(message_handler)
+                    future.set(signal)
 
-        bus2.add_message_handler(message_handler)
-        return await future
+            bus2.add_message_handler(message_handler)
+            return await future
 
-    bus2.send(
-        Message(destination=bus1.unique_name,
+        bus2.send(
+            Message(
+                destination=bus1.unique_name,
                 interface=interface.name,
                 path=export_path,
                 member='do_emit_properties_changed'))
 
-    signal = await wait_for_message()
-    assert signal.interface == 'org.freedesktop.DBus.Properties'
-    assert signal.member == 'PropertiesChanged'
-    assert signal.signature == 'sa{sv}as'
-    assert signal.body == [
-        interface.name, {
-            'string_prop': Variant('s', 'asdf')
-        }, ['container_prop']
-    ]
+        signal = await wait_for_message()
+        assert signal.interface == 'org.freedesktop.DBus.Properties'
+        assert signal.member == 'PropertiesChanged'
+        assert signal.signature == 'sa{sv}as'
+        assert signal.body == [
+            interface.name, {
+                'string_prop': Variant('s', 'asdf')
+            }, ['container_prop']
+        ]

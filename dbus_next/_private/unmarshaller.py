@@ -112,7 +112,7 @@ class Unmarshaller:
         a previous message with non-aligned length in the buffer, in front
         of the current one.
         """
-        return (self.start-offset) & (align - 1)
+        return (self.start - offset) & (align - 1)
 
     def align(self, n):
         padding = self._padding(self.offset, n)
@@ -277,19 +277,20 @@ class Unmarshaller:
             for type_ in signature_tree.types:
                 body.append(self.read_argument(type_))
 
-        self.message = Message(destination=destination,
-                               path=path,
-                               interface=interface,
-                               member=member,
-                               message_type=message_type,
-                               flags=flags,
-                               error_name=error_name,
-                               reply_serial=reply_serial,
-                               sender=sender,
-                               unix_fds=self.unix_fds,
-                               signature=signature_tree,
-                               body=body,
-                               serial=serial)
+        self.message = Message(
+            destination=destination,
+            path=path,
+            interface=interface,
+            member=member,
+            message_type=message_type,
+            flags=flags,
+            error_name=error_name,
+            reply_serial=reply_serial,
+            sender=sender,
+            unix_fds=self.unix_fds,
+            signature=signature_tree,
+            body=body,
+            serial=serial)
         self.unix_fds = []
 
     def unmarshall(self):

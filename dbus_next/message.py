@@ -54,6 +54,7 @@ class Message:
         - :class:`InvalidMemberNameError` - If ``member`` is not a valid member name.
         - :class:`InvalidInterfaceNameError` - If ``error_name`` or ``interface`` is not a valid interface name.
     """
+
     def __init__(self,
                  destination: str = None,
                  path: str = None,
@@ -127,12 +128,13 @@ class Message:
         :raises:
             - :class:`InvalidInterfaceNameError` - If the error_name is not a valid interface name.
         """
-        return Message(message_type=MessageType.ERROR,
-                       reply_serial=msg.serial,
-                       destination=msg.sender,
-                       error_name=error_name,
-                       signature='s',
-                       body=[error_text])
+        return Message(
+            message_type=MessageType.ERROR,
+            reply_serial=msg.serial,
+            destination=msg.sender,
+            error_name=error_name,
+            signature='s',
+            body=[error_text])
 
     @staticmethod
     def new_method_return(msg: 'Message',
@@ -156,12 +158,13 @@ class Message:
         :raises:
             - :class:`InvalidSignatureError` - If the signature is not a valid signature.
         """
-        return Message(message_type=MessageType.METHOD_RETURN,
-                       reply_serial=msg.serial,
-                       destination=msg.sender,
-                       signature=signature,
-                       body=body,
-                       unix_fds=unix_fds)
+        return Message(
+            message_type=MessageType.METHOD_RETURN,
+            reply_serial=msg.serial,
+            destination=msg.sender,
+            signature=signature,
+            body=body,
+            unix_fds=unix_fds)
 
     @staticmethod
     def new_signal(path: str,
@@ -195,13 +198,14 @@ class Message:
             - :class:`InvalidMemberNameError` - If ``member`` is not a valid member name.
         """
         body = body if body else []
-        return Message(message_type=MessageType.SIGNAL,
-                       interface=interface,
-                       path=path,
-                       member=member,
-                       signature=signature,
-                       body=body,
-                       unix_fds=unix_fds)
+        return Message(
+            message_type=MessageType.SIGNAL,
+            interface=interface,
+            path=path,
+            member=member,
+            signature=signature,
+            body=body,
+            unix_fds=unix_fds)
 
     def _matches(self, **kwargs):
         for attr, val in kwargs.items():

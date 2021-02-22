@@ -4,7 +4,7 @@ import pytest
 # causes test/test_fd_passing.py::test_sending_file_descriptor_with_proxy
 # to hang with Trio. To be investigated.
 
+
 @pytest.fixture
 def anyio_backend():
     return "trio"
-

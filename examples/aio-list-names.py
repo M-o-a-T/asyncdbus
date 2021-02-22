@@ -14,10 +14,11 @@ async def main():
     async with MessageBus().connect() as bus:
 
         reply = await bus.call(
-            Message(destination='org.freedesktop.DBus',
-                    path='/org/freedesktop/DBus',
-                    interface='org.freedesktop.DBus',
-                    member='ListNames'))
+            Message(
+                destination='org.freedesktop.DBus',
+                path='/org/freedesktop/DBus',
+                interface='org.freedesktop.DBus',
+                member='ListNames'))
 
         if reply.message_type == MessageType.ERROR:
             raise Exception(reply.body[0])

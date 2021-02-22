@@ -85,6 +85,7 @@ class ProxyInterface:
     :ivar bus: The message bus this proxy interface is connected to.
     :vartype bus: :class:`MessageBus <asyncdbus.message_bus.MessageBus>`
     """
+
     def __init__(self, bus_name, path, introspection, bus):
 
         self.bus_name = bus_name
@@ -117,14 +118,15 @@ class ProxyInterface:
             input_body, unix_fds = replace_fds_with_idx(intr_method.in_signature, list(args))
 
             msg = await self.bus.call(
-                Message(destination=self.bus_name,
-                        path=self.path,
-                        interface=self.introspection.name,
-                        member=intr_method.name,
-                        signature=intr_method.in_signature,
-                        body=input_body,
-                        flags=flags,
-                        unix_fds=unix_fds))
+                Message(
+                    destination=self.bus_name,
+                    path=self.path,
+                    interface=self.introspection.name,
+                    member=intr_method.name,
+                    signature=intr_method.in_signature,
+                    body=input_body,
+                    flags=flags,
+                    unix_fds=unix_fds))
 
             if flags & MessageFlag.NO_REPLY_EXPECTED:
                 return None
@@ -148,12 +150,13 @@ class ProxyInterface:
     def _add_property(self, intr_property):
         async def property_getter():
             msg = await self.bus.call(
-                Message(destination=self.bus_name,
-                        path=self.path,
-                        interface='org.freedesktop.DBus.Properties',
-                        member='Get',
-                        signature='ss',
-                        body=[self.introspection.name, intr_property.name]))
+                Message(
+                    destination=self.bus_name,
+                    path=self.path,
+                    interface='org.freedesktop.DBus.Properties',
+                    member='Get',
+                    signature='ss',
+                    body=[self.introspection.name, intr_property.name]))
 
             self._check_method_return(msg, 'v')
             variant = msg.body[0]
@@ -171,13 +174,14 @@ class ProxyInterface:
                 'ssv', [self.introspection.name, intr_property.name, variant])
 
             msg = await self.bus.call(
-                Message(destination=self.bus_name,
-                        path=self.path,
-                        interface='org.freedesktop.DBus.Properties',
-                        member='Set',
-                        signature='ssv',
-                        body=body,
-                        unix_fds=unix_fds))
+                Message(
+                    destination=self.bus_name,
+                    path=self.path,
+                    interface='org.freedesktop.DBus.Properties',
+                    member='Set',
+                    signature='ssv',
+                    body=body,
+                    unix_fds=unix_fds))
 
             self._check_method_return(msg)
 
@@ -186,9 +190,9 @@ class ProxyInterface:
         setattr(self, f'set_{snake_case}', property_setter)
 
     def _message_handler(self, msg):
-        if not msg._matches(message_type=MessageType.SIGNAL,
-                            interface=self.introspection.name,
-                            path=self.path) or msg.member not in self._signal_handlers:
+        if not msg._matches(
+                message_type=MessageType.SIGNAL, interface=self.introspection.name,
+                path=self.path) or msg.member not in self._signal_handlers:
             return
 
         if msg.sender != self.bus_name and self.bus._name_owners.get(self.bus_name,
@@ -281,6 +285,7 @@ class ProxyObject:
         - :class:`InvalidObjectPathError <asyncdbus.InvalidObjectPathError>` - If the given object path is not valid.
         - :class:`InvalidIntrospectionError <asyncdbus.InvalidIntrospectionError>` - If the introspection data for the node is not valid.
     """
+
     def __init__(self, bus_name: str, path: str, introspection: Union[intr.Node, str, ET.Element],
                  bus: 'message_bus.MessageBus'):
         assert_object_path_valid(path)
@@ -349,12 +354,13 @@ class ProxyObject:
 
         if self.bus_name[0] != ':' and not self.bus._name_owners.get(self.bus_name, ''):
             self.bus._call(
-                Message(destination='org.freedesktop.DBus',
-                        interface='org.freedesktop.DBus',
-                        path='/org/freedesktop/DBus',
-                        member='GetNameOwner',
-                        signature='s',
-                        body=[self.bus_name]), get_owner_notify)
+                Message(
+                    destination='org.freedesktop.DBus',
+                    interface='org.freedesktop.DBus',
+                    path='/org/freedesktop/DBus',
+                    member='GetNameOwner',
+                    signature='s',
+                    body=[self.bus_name]), get_owner_notify)
 
         self._interfaces[name] = interface
         return interface

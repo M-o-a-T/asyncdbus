@@ -29,7 +29,7 @@ from typing import Type, Callable, Optional, Union
 
 
 @attr.s
-class ValueEvent: 
+class ValueEvent:
     """A waitable value useful for inter-task synchronization,
     inspired by :class:`threading.Event`.
         
@@ -117,6 +117,7 @@ class MessageBus:
         and receive messages.
     :vartype connected: bool
     """
+
     def __init__(self,
                  bus_address: Optional[str] = None,
                  bus_type: BusType = BusType.SESSION,
@@ -276,10 +277,11 @@ class MessageBus:
             future.set(result)
 
         self._call(
-            Message(destination=bus_name,
-                    path=path,
-                    interface='org.freedesktop.DBus.Introspectable',
-                    member='Introspect'), reply_notify)
+            Message(
+                destination=bus_name,
+                path=path,
+                interface='org.freedesktop.DBus.Introspectable',
+                member='Introspect'), reply_notify)
 
         with anyio.fail_after(timeout):
             return await future
@@ -308,11 +310,12 @@ class MessageBus:
                                                           prop.prop_getter(interface))
 
         self.send(
-            Message.new_signal(path=path,
-                               interface='org.freedesktop.DBus.ObjectManager',
-                               member='InterfacesAdded',
-                               signature='oa{sa{sv}}',
-                               body=[path, body]))
+            Message.new_signal(
+                path=path,
+                interface='org.freedesktop.DBus.ObjectManager',
+                member='InterfacesAdded',
+                signature='oa{sa{sv}}',
+                body=[path, body]))
 
     def _emit_interface_removed(self, path, removed_interfaces):
         """Emit the ``org.freedesktop.DBus.ObjectManager.InterfacesRemoved` signal.
@@ -329,15 +332,14 @@ class MessageBus:
             return
 
         self.send(
-            Message.new_signal(path=path,
-                               interface='org.freedesktop.DBus.ObjectManager',
-                               member='InterfacesRemoved',
-                               signature='oas',
-                               body=[path, removed_interfaces]))
+            Message.new_signal(
+                path=path,
+                interface='org.freedesktop.DBus.ObjectManager',
+                member='InterfacesRemoved',
+                signature='oas',
+                body=[path, removed_interfaces]))
 
-    async def request_name(self,
-                     name: str,
-                     flags: NameFlag = NameFlag.NONE):
+    async def request_name(self, name: str, flags: NameFlag = NameFlag.NONE):
         """Request that this message bus owns the given name.
 
         :param name: The name to request.
@@ -369,12 +371,13 @@ class MessageBus:
             flags = NameFlag(flags)
 
         self._call(
-            Message(destination='org.freedesktop.DBus',
-                    path='/org/freedesktop/DBus',
-                    interface='org.freedesktop.DBus',
-                    member='RequestName',
-                    signature='su',
-                    body=[name, flags]), reply_notify)
+            Message(
+                destination='org.freedesktop.DBus',
+                path='/org/freedesktop/DBus',
+                interface='org.freedesktop.DBus',
+                member='RequestName',
+                signature='su',
+                body=[name, flags]), reply_notify)
 
         return await future
 
@@ -406,12 +409,13 @@ class MessageBus:
             future.set(result)
 
         self._call(
-            Message(destination='org.freedesktop.DBus',
-                    path='/org/freedesktop/DBus',
-                    interface='org.freedesktop.DBus',
-                    member='ReleaseName',
-                    signature='s',
-                    body=[name]), reply_notify)
+            Message(
+                destination='org.freedesktop.DBus',
+                path='/org/freedesktop/DBus',
+                interface='org.freedesktop.DBus',
+                member='ReleaseName',
+                signature='s',
+                body=[name]), reply_notify)
 
         return await future
 
@@ -517,7 +521,7 @@ class MessageBus:
             self._tg.cancel_scope.cancel()
         self._write = None
 
-        sock,self._sock = self._sock,None
+        sock, self._sock = self._sock, None
         sock.close()
 
         for handler in self._method_return_handlers.values():
@@ -532,7 +536,6 @@ class MessageBus:
             self.unexport(path)
 
         self._user_message_handlers.clear()
-
 
     def _has_interface(self, interface: ServiceInterface) -> bool:
         for _, exports in self._path_exports.items():
@@ -559,12 +562,13 @@ class MessageBus:
             raise Exception('Could not find interface on bus (this is a bug in dbus-next)')
 
         self.send(
-            Message.new_signal(path=path,
-                               interface=interface_name,
-                               member=member,
-                               signature=signature,
-                               body=body,
-                               unix_fds=unix_fds))
+            Message.new_signal(
+                path=path,
+                interface=interface_name,
+                member=member,
+                signature=signature,
+                body=body,
+                unix_fds=unix_fds))
 
     def _introspect_export_path(self, path):
         assert_object_path_valid(path)
@@ -750,10 +754,11 @@ class MessageBus:
                     break
 
         if msg.message_type == MessageType.SIGNAL:
-            if msg._matches(sender='org.freedesktop.DBus',
-                            path='/org/freedesktop/DBus',
-                            interface='org.freedesktop.DBus',
-                            member='NameOwnerChanged'):
+            if msg._matches(
+                    sender='org.freedesktop.DBus',
+                    path='/org/freedesktop/DBus',
+                    interface='org.freedesktop.DBus',
+                    member='NameOwnerChanged'):
                 [name, old_owner, new_owner] = msg.body
                 if new_owner:
                     self._name_owners[name] = new_owner
@@ -798,9 +803,8 @@ class MessageBus:
     def _find_message_handler(self, msg):
         handler = None
 
-        if msg._matches(interface='org.freedesktop.DBus.Introspectable',
-                        member='Introspect',
-                        signature=''):
+        if msg._matches(
+                interface='org.freedesktop.DBus.Introspectable', member='Introspect', signature=''):
             return self._default_introspect_handler
 
         elif msg._matches(interface='org.freedesktop.DBus.Properties'):
@@ -811,8 +815,8 @@ class MessageBus:
                 return self._default_ping_handler
             elif msg._matches(member='GetMachineId', signature=''):
                 return self._default_get_machine_id_handler
-        elif msg._matches(interface='org.freedesktop.DBus.ObjectManager',
-                          member='GetManagedObjects'):
+        elif msg._matches(
+                interface='org.freedesktop.DBus.ObjectManager', member='GetManagedObjects'):
             return self._default_get_managed_objects_handler
 
         else:
@@ -820,9 +824,9 @@ class MessageBus:
                 for method in ServiceInterface._get_methods(interface):
                     if method.disabled:
                         continue
-                    if msg._matches(interface=interface.name,
-                                    member=method.name,
-                                    signature=method.in_signature):
+                    if msg._matches(
+                            interface=interface.name, member=method.name,
+                            signature=method.in_signature):
                         return self._make_method_handler(interface, method)
 
         return None
@@ -853,10 +857,11 @@ class MessageBus:
                 send_reply(Message.new_error(msg, ErrorType.FAILED, 'could not get machine_id'))
 
         self._call(
-            Message(destination='org.freedesktop.DBus',
-                    path='/org/freedesktop/DBus',
-                    interface='org.freedesktop.DBus.Peer',
-                    member='GetMachineId'), reply_handler)
+            Message(
+                destination='org.freedesktop.DBus',
+                path='/org/freedesktop/DBus',
+                interface='org.freedesktop.DBus.Peer',
+                member='GetMachineId'), reply_handler)
 
     def _default_get_managed_objects_handler(self, msg, send_reply):
         result = {}
@@ -931,9 +936,8 @@ class MessageBus:
                 body, unix_fds = replace_fds_with_idx(prop.signature, [prop_value])
 
                 send_reply(
-                    Message.new_method_return(msg,
-                                              'v', [Variant(prop.signature, body[0])],
-                                              unix_fds=unix_fds))
+                    Message.new_method_return(
+                        msg, 'v', [Variant(prop.signature, body[0])], unix_fds=unix_fds))
             elif msg.member == 'Set':
                 if not prop.access.writable():
                     raise DBusError(ErrorType.PROPERTY_READ_ONLY, 'the property is readonly')
@@ -982,12 +986,13 @@ class MessageBus:
                 )
 
         self._call(
-            Message(destination='org.freedesktop.DBus',
-                    interface='org.freedesktop.DBus',
-                    path='/org/freedesktop/DBus',
-                    member='AddMatch',
-                    signature='s',
-                    body=[self._name_owner_match_rule]), add_match_notify)
+            Message(
+                destination='org.freedesktop.DBus',
+                interface='org.freedesktop.DBus',
+                path='/org/freedesktop/DBus',
+                member='AddMatch',
+                signature='s',
+                body=[self._name_owner_match_rule]), add_match_notify)
 
     def _add_match_rule(self, match_rule):
         '''Add a match rule. Match rules added by this function are refcounted
@@ -1009,12 +1014,13 @@ class MessageBus:
                 logging.error(f'add match request failed. match="{match_rule}", {msg.body[0]}')
 
         self._call(
-            Message(destination='org.freedesktop.DBus',
-                    interface='org.freedesktop.DBus',
-                    path='/org/freedesktop/DBus',
-                    member='AddMatch',
-                    signature='s',
-                    body=[match_rule]), add_match_notify)
+            Message(
+                destination='org.freedesktop.DBus',
+                interface='org.freedesktop.DBus',
+                path='/org/freedesktop/DBus',
+                member='AddMatch',
+                signature='s',
+                body=[match_rule]), add_match_notify)
 
     def _remove_match_rule(self, match_rule):
         '''Remove a match rule added with _add_match_rule(). This is for use in
@@ -1036,12 +1042,13 @@ class MessageBus:
                 logging.error(f'remove match request failed. match="{match_rule}", {msg.body[0]}')
 
         self._call(
-            Message(destination='org.freedesktop.DBus',
-                    interface='org.freedesktop.DBus',
-                    path='/org/freedesktop/DBus',
-                    member='RemoveMatch',
-                    signature='s',
-                    body=[match_rule]), remove_match_notify)
+            Message(
+                destination='org.freedesktop.DBus',
+                interface='org.freedesktop.DBus',
+                path='/org/freedesktop/DBus',
+                member='RemoveMatch',
+                signature='s',
+                body=[match_rule]), remove_match_notify)
 
     async def _setup_socket_aio(self):
         err = None
@@ -1084,7 +1091,7 @@ class MessageBus:
                     ip_port = int(options['port'])
 
                 try:
-                    sock = socket.create_connection((ip_addr,ip_port))
+                    sock = socket.create_connection((ip_addr, ip_port))
                     sock.setblocking(False)
                 except (BlockingIOError, InterruptedError):
                     await anyio.wait_socket_writable(sock)
@@ -1108,7 +1115,6 @@ class MessageBus:
 
         self._sock = sock
         self._fd = self._sock.fileno()
-
 
     @asynccontextmanager
     async def connect(self) -> 'MessageBus':
@@ -1145,11 +1151,12 @@ class MessageBus:
                 except Exception as e:
                     future.set_error(e)
 
-            hello_msg = Message(destination='org.freedesktop.DBus',
-                                path='/org/freedesktop/DBus',
-                                interface='org.freedesktop.DBus',
-                                member='Hello',
-                                serial=self.next_serial())
+            hello_msg = Message(
+                destination='org.freedesktop.DBus',
+                path='/org/freedesktop/DBus',
+                interface='org.freedesktop.DBus',
+                member='Hello',
+                serial=self.next_serial())
 
             self._method_return_handlers[hello_msg.serial] = on_hello
             await anyio.wait_socket_writable(self._sock)
@@ -1164,8 +1171,7 @@ class MessageBus:
             finally:
                 await self._finalize()
             tg.cancel_scope.cancel()
-            pass # close TG
-
+            pass  # close TG
 
     async def call(self, msg: Message) -> Optional[Message]:
         """Send a method call and wait for a reply from the DBus daemon.
@@ -1249,10 +1255,10 @@ class MessageBus:
                 await anyio.wait_socket_readable(self._sock)
                 if self._sock is None:
                     return
-                data,aux,*_ = self._sock.recvmsg(8192,4096)
+                data, aux, *_ = self._sock.recvmsg(8192, 4096)
                 if not data:
                     raise anyio.EndOfStream
-                unmarshaller.feed(data,aux)
+                unmarshaller.feed(data, aux)
 
                 for msg in unmarshaller:
                     self._on_message(msg)
@@ -1272,8 +1278,8 @@ class MessageBus:
                     if self._sock is None:
                         return
                     if unix_fds and self._negotiate_unix_fd:
-                        ancdata = [(socket.SOL_SOCKET, socket.SCM_RIGHTS,
-                                    array.array("i", unix_fds))]
+                        ancdata = [(socket.SOL_SOCKET, socket.SCM_RIGHTS, array.array(
+                            "i", unix_fds))]
 
                         done2 = self._sock.sendmsg([buf[done:]], ancdata)
                         unix_fds = None
@@ -1286,8 +1292,8 @@ class MessageBus:
                 fut.set(None)
 
     def buffer_message(self, msg: Message, future=None):
-        self._write.send_nowait(
-            (msg._marshall(negotiate_unix_fd=self._negotiate_unix_fd), copy(msg.unix_fds), future))
+        self._write.send_nowait((msg._marshall(negotiate_unix_fd=self._negotiate_unix_fd),
+                                 copy(msg.unix_fds), future))
 
     def _schedule_write(self, msg: Message = None, future=None):
         if msg is not None:
@@ -1324,4 +1330,3 @@ class MessageBus:
                 done = self._sock.send(Authenticator._format_line(response))
             if response == 'BEGIN':
                 break
-

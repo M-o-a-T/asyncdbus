@@ -16,16 +16,16 @@ parser.add_argument('--system', help='Use the system bus', action='store_true')
 parser.add_argument('--session', help='Use the session bus', action='store_true')
 parser.add_argument('--dest', help='The destination address for the message', required=True)
 parser.add_argument('--signature', help='The signature for the message body')
-parser.add_argument('--type',
-                    help='The type of message to send',
-                    choices=[e.name for e in MessageType],
-                    default=MessageType.METHOD_CALL.name,
-                    nargs=OPTIONAL)
+parser.add_argument(
+    '--type',
+    help='The type of message to send',
+    choices=[e.name for e in MessageType],
+    default=MessageType.METHOD_CALL.name,
+    nargs=OPTIONAL)
 parser.add_argument('object_path', help='The object path for the message')
 parser.add_argument('interface.member', help='The interface and member for the message')
-parser.add_argument('body',
-                    help='The JSON encoded body of the message. Must match the signature',
-                    nargs=OPTIONAL)
+parser.add_argument(
+    'body', help='The JSON encoded body of the message. Must match the signature', nargs=OPTIONAL)
 
 args = parser.parse_args()
 
@@ -91,12 +91,13 @@ else:
 async def main():
     async with MessageBus(bus_type=bus_type).connect() as bus:
 
-        message = Message(destination=destination,
-                        member=member,
-                        interface=interface,
-                        path=object_path,
-                        signature=signature,
-                        body=body)
+        message = Message(
+            destination=destination,
+            member=member,
+            interface=interface,
+            path=object_path,
+            signature=signature,
+            body=body)
 
         result = await bus.call(message)
 
