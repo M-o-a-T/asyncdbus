@@ -21,9 +21,10 @@ async def main():
     async with MessageBus(bus_address="tcp:host=127.0.0.1,port=55556").connect() as bus:
         introspection = await bus.introspect('org.freedesktop.Notifications',
                                              '/org/freedesktop/Notifications')
-        obj = bus.get_proxy_object('org.freedesktop.Notifications',
-                                   '/org/freedesktop/Notifications', introspection)
-        notification = obj.get_interface('org.freedesktop.Notifications')
+        obj = await bus.get_proxy_object('org.freedesktop.Notifications',
+                                         '/org/freedesktop/Notifications',
+                                         introspection)
+        notification = await obj.get_interface('org.freedesktop.Notifications')
         await notification.call_notify("test.py", 0, "", "DBus Test", "Test notification", [""],
                                        dict(), 5000)
 

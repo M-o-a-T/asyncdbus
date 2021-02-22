@@ -5,9 +5,12 @@
 This version forks the library and converts it to anyio.
 
 * remove aio and glib subpackages
-* temporarily use ValueEvent instead of `asyncio.Future`
+* remove all uses of some "Future" data type
 * minimal surgery to get it all to work with what will become anyio 3
 * `MessageBus.connect()` is now an async context manager
+* error replies now raise `DBusError`
+* several methods are now async: they wait for the reply
+  and may raise an error
 
 
 # Changelog for dbus-next

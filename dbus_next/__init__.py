@@ -7,7 +7,7 @@ from .errors import (SignatureBodyMismatchError, InvalidSignatureError, InvalidA
                      DBusError)
 from . import introspection
 from .message import Message
-from .message_bus import MessageBus, ValueEvent
+from .message_bus import MessageBus
 from .proxy_object import ProxyObject, ProxyInterface
 from . import service
 from .signature import SignatureType, SignatureTree, Variant

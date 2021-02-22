@@ -60,11 +60,11 @@ If any file descriptors are sent or received (DBus type ``h``), the variable ref
         # introspection = await bus.introspect('com.example.name',
         #                                      '/com/example/sample_object0')
 
-        proxy_object = bus.get_proxy_object('com.example.name',
-                                            '/com/example/sample_object0',
-                                            introspection)
+        proxy_object = await bus.get_proxy_object('com.example.name',
+                                                  '/com/example/sample_object0',
+                                                  introspection)
 
-        interface = proxy_object.get_interface('com.example.SampleInterface0')
+        interface = await proxy_object.get_interface('com.example.SampleInterface0')
 
         # Use call_[METHOD] in snake case to call methods, passing the
         # in args and receiving the out args. The `baz` returned will

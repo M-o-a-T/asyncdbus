@@ -1,7 +1,7 @@
 """This tests the ability to send and receive file descriptors in dbus messages"""
 from asyncdbus.service import ServiceInterface, method, signal, dbus_property
 from asyncdbus.signature import SignatureTree, Variant
-from asyncdbus import Message, MessageType, MessageBus, ValueEvent
+from asyncdbus import Message, MessageType, MessageBus
 import os
 import anyio
 import pytest
@@ -83,7 +83,7 @@ async def test_sending_file_descriptor_low_level():
             signature='h',
             unix_fds=[fd_before])
 
-        def message_handler(sent):
+        async def message_handler(sent):
             nonlocal fd_after
             if sent.sender == bus2.unique_name and sent.serial == msg.serial:
                 assert sent.path == msg.path
@@ -93,7 +93,7 @@ async def test_sending_file_descriptor_low_level():
                 assert sent.body == [0]
                 assert len(sent.unix_fds) == 1
                 fd_after = sent.unix_fds[0]
-                bus1.send(Message.new_method_return(sent, 's', ['got it']))
+                await bus1.send(Message.new_method_return(sent, 's', ['got it']))
                 bus1.remove_message_handler(message_handler)
                 return True
 
@@ -129,7 +129,7 @@ async def test_high_level_service_fd_passing():
                     body=body,
                     unix_fds=unix_fds))
 
-        bus1.export(export_path, interface)
+        await bus1.export(export_path, interface)
 
         # test that an fd can be returned by the service
         reply = await call('ReturnsFd')
@@ -150,11 +150,14 @@ async def test_high_level_service_fd_passing():
         os.close(fd)
 
         # signals
-        fut = ValueEvent()
+        evt = anyio.create_event()
+        res = None
 
         def fd_listener(msg):
+            nonlocal res
             if msg.sender == bus1.unique_name and msg.message_type == MessageType.SIGNAL:
-                fut.set_result(msg)
+                res = msg
+                evt.set()
 
         reply = await bus2.call(
             Message(
@@ -166,8 +169,9 @@ async def test_high_level_service_fd_passing():
         assert reply.message_type == MessageType.METHOD_RETURN
 
         bus2.add_message_handler(fd_listener)
-        interface.SignalFd()
-        reply = await fut
+        await interface.SignalFd()
+        await evt.wait()
+        reply = res
 
         assert len(reply.unix_fds) == 1, (reply.unix_fds, interface.get_last_fd())
         assert reply.body == [0]
@@ -217,13 +221,13 @@ async def test_sending_file_descriptor_with_proxy():
     async with MessageBus(negotiate_unix_fd=True).connect() as bus:
 
         interface = ExampleInterface(interface_name)
-        bus.export(path, interface)
+        await bus.export(path, interface)
         await bus.request_name(name)
 
         intr = await bus.introspect(name, path)
 
-        proxy = bus.get_proxy_object(name, path, intr)
-        proxy_interface = proxy.get_interface(interface_name)
+        proxy = await bus.get_proxy_object(name, path, intr)
+        proxy_interface = await proxy.get_interface(interface_name)
 
         # test fds are replaced correctly in all high level interfaces
         fd = await proxy_interface.call_returns_fd()
@@ -248,16 +252,20 @@ async def test_sending_file_descriptor_with_proxy():
         interface.cleanup()
         os.close(fd)
 
-        fut = ValueEvent()
+        evt = anyio.create_event()
+        res = None
 
-        def on_signal_fd(fd):
-            fut.set_result(fd)
-            proxy_interface.off_signal_fd(on_signal_fd)
+        async def on_signal_fd(fd):
+            nonlocal res
+            res = fd
+            evt.set()
+            await proxy_interface.off_signal_fd(on_signal_fd)
 
-        proxy_interface.on_signal_fd(on_signal_fd)
+        await proxy_interface.on_signal_fd(on_signal_fd)
         await anyio.sleep(0.1)  # TODO we have a timing problem here
-        interface.SignalFd()
-        fd = await fut
+        await interface.SignalFd()
+        await evt.wait()
+        fd = res
         assert_fds_equal(interface.get_last_fd(), fd)
         interface.cleanup()
         os.close(fd)

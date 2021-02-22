@@ -171,11 +171,13 @@ def signal(name: str = None, disabled: bool = False):
         signal = _Signal(fn, fn_name, disabled)
 
         @wraps(fn)
-        def wrapped(self, *args, **kwargs):
+        async def wrapped(self, *args, **kwargs):
             if signal.disabled:
                 raise SignalDisabledError('Tried to call a disabled signal')
             result = fn(self, *args, **kwargs)
-            ServiceInterface._handle_signal(self, signal, result)
+            if inspect.iscoroutine(result):
+                result = await result
+            await ServiceInterface._handle_signal(self, signal, result)
             return result
 
         wrapped.__dict__['__DBUS_SIGNAL'] = signal
@@ -357,7 +359,7 @@ class ServiceInterface:
             if prop.access.writable() and prop.prop_setter is None:
                 raise ValueError(f'property "{prop.name}" is writable but does not have a setter')
 
-    def emit_properties_changed(self,
+    async def emit_properties_changed(self,
                                 changed_properties: Dict[str, Any],
                                 invalidated_properties: List[str] = []):
         """Emit the ``org.freedesktop.DBus.Properties.PropertiesChanged`` signal.
@@ -379,7 +381,7 @@ class ServiceInterface:
 
         body = [self.name, variant_dict, invalidated_properties]
         for bus in ServiceInterface._get_buses(self):
-            bus._interface_signal_notify(self, 'org.freedesktop.DBus.Properties',
+            await bus._interface_signal_notify(self, 'org.freedesktop.DBus.Properties',
                                          'PropertiesChanged', 'sa{sv}as', body)
 
     def introspect(self) -> intr.Interface:
@@ -464,9 +466,9 @@ class ServiceInterface:
         return replace_fds_with_idx(signature_tree, result)
 
     @staticmethod
-    def _handle_signal(interface, signal, result):
+    async def _handle_signal(interface, signal, result):
         body, fds = ServiceInterface._fn_result_to_body(result, signal.signature_tree)
         for bus in ServiceInterface._get_buses(interface):
             # TODO: can signal pass fds?
-            bus._interface_signal_notify(interface, interface.name, signal.name, signal.signature,
+            await bus._interface_signal_notify(interface, interface.name, signal.name, signal.signature,
                                          body, fds)

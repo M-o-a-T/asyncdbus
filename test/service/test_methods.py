@@ -116,7 +116,7 @@ async def test_methods(interface_class):
                     body=body,
                     flags=flags))
 
-        bus1.export(export_path, interface)
+        await bus1.export(export_path, interface)
 
         body = ['hello world']
         reply = await call('echo', 's', body)
@@ -147,11 +147,15 @@ async def test_methods(interface_class):
         assert reply.signature == ''
         assert reply.body == []
 
-        reply = await call('throws_unexpected_error')
+        with pytest.raises(DBusError) as err:
+            await call('throws_unexpected_error')
+        reply = err.value.reply
         assert reply.message_type == MessageType.ERROR, reply.body[0]
         assert reply.error_name == ErrorType.SERVICE_ERROR.value, reply.body[0]
 
-        reply = await call('throws_dbus_error')
+        with pytest.raises(DBusError) as err:
+            await call('throws_dbus_error')
+        reply = err.value.reply
         assert reply.message_type == MessageType.ERROR, reply.body[0]
         assert reply.error_name == 'test.error', reply.body[0]
         assert reply.body == ['an error ocurred']

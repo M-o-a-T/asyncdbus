@@ -19,7 +19,7 @@ async def test_aio_big_message():
     async with MessageBus().connect() as bus1, \
             MessageBus().connect() as bus2:
         interface = ExampleInterface()
-        bus1.export('/test/path', interface)
+        await bus1.export('/test/path', interface)
 
         # two megabytes
         big_body = [bytes(1000000) * 2]

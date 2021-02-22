@@ -1,5 +1,6 @@
 from asyncdbus.service import ServiceInterface, dbus_property, PropertyAccess
 from asyncdbus.signature import Variant
+from asyncdbus.errors import DBusError
 from asyncdbus import Message, MessageBus, MessageType, introspection as intr
 from asyncdbus.constants import ErrorType
 
@@ -37,8 +38,8 @@ async def test_introspectable_interface():
         interface2 = ExampleInterface('test.interface2')
 
         export_path = '/test/path'
-        bus1.export(export_path, interface)
-        bus1.export(export_path, interface2)
+        await bus1.export(export_path, interface)
+        await bus1.export(export_path, interface2)
 
         reply = await bus2.call(
             Message(
@@ -122,9 +123,9 @@ async def test_object_manager():
         interface2 = ExampleComplexInterface('test.interface2')
 
         export_path = '/test/path'
-        bus1.export(export_path, interface)
-        bus1.export(export_path, interface2)
-        bus1.export(export_path + '/deeper', interface2)
+        await bus1.export(export_path, interface)
+        await bus1.export(export_path, interface2)
+        await bus1.export(export_path + '/deeper', interface2)
 
         reply_root = await bus2.call(
             Message(
@@ -166,32 +167,36 @@ async def test_standard_interface_properties():
 
         interface = ExampleInterface('test.interface1')
         export_path = '/test/path'
-        bus1.export(export_path, interface)
+        await bus1.export(export_path, interface)
 
         for iface in [
                 'org.freedesktop.DBus.Properties', 'org.freedesktop.DBus.Introspectable',
                 'org.freedesktop.DBus.Peer', 'org.freedesktop.DBus.ObjectManager'
         ]:
 
-            result = await bus2.call(
-                Message(
-                    destination=bus1.unique_name,
-                    path=export_path,
-                    interface='org.freedesktop.DBus.Properties',
-                    member='Get',
-                    signature='ss',
-                    body=[iface, 'anything']))
+            with pytest.raises(DBusError) as err:
+                result = await bus2.call(
+                    Message(
+                        destination=bus1.unique_name,
+                        path=export_path,
+                        interface='org.freedesktop.DBus.Properties',
+                        member='Get',
+                        signature='ss',
+                        body=[iface, 'anything']))
+            result = err.value.reply
             assert result.message_type is MessageType.ERROR
             assert result.error_name == ErrorType.UNKNOWN_PROPERTY.value
 
-            result = await bus2.call(
-                Message(
-                    destination=bus1.unique_name,
-                    path=export_path,
-                    interface='org.freedesktop.DBus.Properties',
-                    member='Set',
-                    signature='ssv',
-                    body=[iface, 'anything', Variant('s', 'new thing')]))
+            with pytest.raises(DBusError) as err:
+                result = await bus2.call(
+                    Message(
+                        destination=bus1.unique_name,
+                        path=export_path,
+                        interface='org.freedesktop.DBus.Properties',
+                        member='Set',
+                        signature='ssv',
+                        body=[iface, 'anything', Variant('s', 'new thing')]))
+            result = err.value.reply
             assert result.message_type is MessageType.ERROR
             assert result.error_name == ErrorType.UNKNOWN_PROPERTY.value
 

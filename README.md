@@ -62,9 +62,9 @@ async def main():
     # this is convenient for development
     introspection = await bus.introspect('org.mpris.MediaPlayer2.vlc', '/org/mpris/MediaPlayer2')
 
-    obj = bus.get_proxy_object('org.mpris.MediaPlayer2.vlc', '/org/mpris/MediaPlayer2', introspection)
-    player = obj.get_interface('org.mpris.MediaPlayer2.Player')
-    properties = obj.get_interface('org.freedesktop.DBus.Properties')
+    obj = await bus.get_proxy_object('org.mpris.MediaPlayer2.vlc', '/org/mpris/MediaPlayer2', introspection)
+    player = await obj.get_interface('org.mpris.MediaPlayer2.Player')
+    properties = await obj.get_interface('org.freedesktop.DBus.Properties')
 
     # call methods on the interface (this causes the media player to play)
     await player.call_play()
@@ -130,7 +130,7 @@ class ExampleInterface(ServiceInterface):
 async def main():
     bus = await MessageBus().connect()
     interface = ExampleInterface('test.interface')
-    bus.export('/test/path', interface)
+    await bus.export('/test/path', interface)
     # now that we are ready to handle requests, we can request name from D-Bus
     await bus.request_name('test.name')
     # wait indefinitely

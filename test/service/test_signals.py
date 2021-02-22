@@ -1,10 +1,11 @@
 from asyncdbus.service import ServiceInterface, signal, SignalDisabledError, dbus_property
-from asyncdbus import Message, MessageType, MessageBus, ValueEvent
+from asyncdbus import Message, MessageType, MessageBus
 from asyncdbus.constants import PropertyAccess
 from asyncdbus.signature import Variant
 
 import pytest
 import anyio
+import outcome
 from contextlib import asynccontextmanager
 
 
@@ -54,7 +55,8 @@ class SecondExampleInterface(ServiceInterface):
 
 class ExpectMessage:
     def __init__(self, bus1, bus2, interface_name, timeout=1):
-        self.future = ValueEvent()
+        self.evt = anyio.create_event()
+        self.result = None
         self.bus1 = bus1
         self.bus2 = bus2
         self.interface_name = interface_name
@@ -65,14 +67,20 @@ class ExpectMessage:
     def message_handler(self, msg):
         if msg.sender == self.bus1.unique_name and msg.interface == self.interface_name:
             self.timeout_task.cancel()
-            self.future.set(msg)
+            self.result = outcome.Value(msg)
+            self.evt.set()
             return True
 
     async def timeout_handler(self, *, task_status):
         with anyio.open_cancel_scope() as self.timeout_task:
             task_status.started()
             await anyio.sleep(self.timeout)
-            self.future.set_error(TimeoutError)
+            self.result = outcome.Error(TimeoutError())
+            self.evt.set()
+
+    async def resolve(self):
+        await self.evt.wait()
+        return self.result.unwrap()
 
     @asynccontextmanager
     async def _ctx(self):
@@ -80,7 +88,7 @@ class ExpectMessage:
         try:
             async with anyio.create_task_group() as tg:
                 await tg.start(self.timeout_handler)
-                yield self.future
+                yield self.resolve()
                 tg.cancel_scope.cancel()
         finally:
             self.bus2.remove_message_handler(self.message_handler)
@@ -111,7 +119,7 @@ async def test_signals():
 
         interface = ExampleInterface('test.interface')
         export_path = '/test/path'
-        bus1.export(export_path, interface)
+        await bus1.export(export_path, interface)
 
         await bus2.call(
             Message(
@@ -123,7 +131,7 @@ async def test_signals():
                 body=[f'sender={bus1.unique_name}']))
 
         async with ExpectMessage(bus1, bus2, interface.name) as expected_signal:
-            interface.signal_empty()
+            await interface.signal_empty()
             assert_signal_ok(
                 signal=await expected_signal,
                 export_path=export_path,
@@ -132,7 +140,7 @@ async def test_signals():
                 body=[])
 
         async with ExpectMessage(bus1, bus2, interface.name) as expected_signal:
-            interface.original_name()
+            await interface.original_name()
             assert_signal_ok(
                 signal=await expected_signal,
                 export_path=export_path,
@@ -141,7 +149,7 @@ async def test_signals():
                 body=[])
 
         async with ExpectMessage(bus1, bus2, interface.name) as expected_signal:
-            interface.signal_simple()
+            await interface.signal_simple()
             assert_signal_ok(
                 signal=await expected_signal,
                 export_path=export_path,
@@ -150,7 +158,7 @@ async def test_signals():
                 body=['hello'])
 
         async with ExpectMessage(bus1, bus2, interface.name) as expected_signal:
-            interface.signal_multiple()
+            await interface.signal_multiple()
             assert_signal_ok(
                 signal=await expected_signal,
                 export_path=export_path,
@@ -159,7 +167,7 @@ async def test_signals():
                 body=['hello', 'world'])
 
         with pytest.raises(SignalDisabledError):
-            interface.signal_disabled()
+            await interface.signal_disabled()
 
 
 @pytest.mark.anyio
@@ -183,7 +191,7 @@ async def test_interface_add_remove_signal():
         # add first interface
         async with ExpectMessage(bus1, bus2,
                                  'org.freedesktop.DBus.ObjectManager') as expected_signal:
-            bus1.export(export_path, first_interface)
+            await bus1.export(export_path, first_interface)
             assert_signal_ok(
                 signal=await expected_signal,
                 export_path=export_path,
@@ -198,7 +206,7 @@ async def test_interface_add_remove_signal():
         # add second interface
         async with ExpectMessage(bus1, bus2,
                                  'org.freedesktop.DBus.ObjectManager') as expected_signal:
-            bus1.export(export_path, second_interface)
+            await bus1.export(export_path, second_interface)
             assert_signal_ok(
                 signal=await expected_signal,
                 export_path=export_path,
@@ -217,7 +225,7 @@ async def test_interface_add_remove_signal():
         # remove single interface
         async with ExpectMessage(bus1, bus2,
                                  'org.freedesktop.DBus.ObjectManager') as expected_signal:
-            bus1.unexport(export_path, second_interface)
+            await bus1.unexport(export_path, second_interface)
             assert_signal_ok(
                 signal=await expected_signal,
                 export_path=export_path,
@@ -228,13 +236,13 @@ async def test_interface_add_remove_signal():
         # add second interface again
         async with ExpectMessage(bus1, bus2,
                                  'org.freedesktop.DBus.ObjectManager') as expected_signal:
-            bus1.export(export_path, second_interface)
+            await bus1.export(export_path, second_interface)
             await expected_signal
 
         # remove multiple interfaces
         async with ExpectMessage(bus1, bus2,
                                  'org.freedesktop.DBus.ObjectManager') as expected_signal:
-            bus1.unexport(export_path)
+            await bus1.unexport(export_path)
             assert_signal_ok(
                 signal=await expected_signal,
                 export_path=export_path,

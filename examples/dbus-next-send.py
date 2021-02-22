@@ -99,7 +99,10 @@ async def main():
             signature=signature,
             body=body)
 
-        result = await bus.call(message)
+        try:
+            result = await bus.call(message)
+        except DBusError as exc:
+            result = exc.reply
 
         ret = 0
 

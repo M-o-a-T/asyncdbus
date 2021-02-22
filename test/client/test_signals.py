@@ -25,16 +25,16 @@ async def test_signals():
             MessageBus().connect() as bus2:
 
         bus_intr = await bus1.introspect('org.freedesktop.DBus', '/org/freedesktop/DBus')
-        bus_obj = bus1.get_proxy_object('org.freedesktop.DBus', '/org/freedesktop/DBus', bus_intr)
-        stats = bus_obj.get_interface('org.freedesktop.DBus.Debug.Stats')
+        bus_obj = await bus1.get_proxy_object('org.freedesktop.DBus', '/org/freedesktop/DBus', bus_intr)
+        stats = await bus_obj.get_interface('org.freedesktop.DBus.Debug.Stats')
 
         await bus1.request_name('test.signals.name')
         service_interface = ExampleInterface()
-        bus1.export('/test/path', service_interface)
+        await bus1.export('/test/path', service_interface)
 
-        obj = bus2.get_proxy_object('test.signals.name', '/test/path',
+        obj = await bus2.get_proxy_object('test.signals.name', '/test/path',
                                     bus1._introspect_export_path('/test/path'))
-        interface = obj.get_interface(service_interface.name)
+        interface = await obj.get_interface(service_interface.name)
 
         async def ping():
             await bus2.call(
@@ -78,8 +78,8 @@ async def test_signals():
         assert len(bus_match_rules) == 1
         assert len(bus2._user_message_handlers) == 0
 
-        interface.on_some_signal(single_handler)
-        interface.on_signal_multiple(multiple_handler)
+        await interface.on_some_signal(single_handler)
+        await interface.on_signal_multiple(multiple_handler)
 
         # Interlude: adding a signal handler with `on_[signal]` should add a match rule and
         # message handler. Removing a signal handler with `off_[signal]` should
@@ -93,12 +93,12 @@ async def test_signals():
         assert "type='signal',interface='test.interface',path='/test/path',sender='test.signals.name'" in bus_match_rules
         assert len(bus2._user_message_handlers) == 1
 
-        service_interface.SomeSignal()
+        await service_interface.SomeSignal()
         await ping()
         assert err is None
         assert single_counter == 1
 
-        service_interface.SignalMultiple()
+        await service_interface.SignalMultiple()
         await ping()
         assert err is None
         assert multiple_counter == 1
@@ -109,27 +109,27 @@ async def test_signals():
         async with MessageBus().connect() as bus3:
             await bus3.request_name('test.signals.name2')
             service_interface2 = ExampleInterface()
-            bus3.export('/test/path', service_interface2)
+            await bus3.export('/test/path', service_interface2)
 
-            obj = bus2.get_proxy_object('test.signals.name2', '/test/path',
+            obj = await bus2.get_proxy_object('test.signals.name2', '/test/path',
                                         bus3._introspect_export_path('/test/path'))
             # we have to add a dummy handler to add the match rule
-            iface2 = obj.get_interface(service_interface2.name)
+            iface2 = await obj.get_interface(service_interface2.name)
 
             def dummy_signal_handler(what):
                 pass
 
-            iface2.on_some_signal(dummy_signal_handler)
+            await iface2.on_some_signal(dummy_signal_handler)
             await ping()
 
-            service_interface2.SomeSignal()
+            await service_interface2.SomeSignal()
             await ping()
             # single_counter is not incremented for signals of the second interface
             assert single_counter == 1
 
-            interface.off_some_signal(single_handler)
-            interface.off_signal_multiple(multiple_handler)
-            iface2.off_some_signal(dummy_signal_handler)
+            await interface.off_some_signal(single_handler)
+            await interface.off_signal_multiple(multiple_handler)
+            await iface2.off_some_signal(dummy_signal_handler)
 
             # After `off_[signal]`, the match rule and user handler should be removed
             await ping()
@@ -161,36 +161,36 @@ async def test_signals_with_changing_owners():
             introspection.interfaces.append(service_interface.introspect())
 
             # get the interface before export
-            obj = bus1.get_proxy_object(well_known_name, '/test/path', introspection)
-            iface = obj.get_interface('test.interface')
+            obj = await bus1.get_proxy_object(well_known_name, '/test/path', introspection)
+            iface = await obj.get_interface('test.interface')
             counter = 0
 
             def handler(what):
                 nonlocal counter
                 counter += 1
 
-            iface.on_some_signal(handler)
+            await iface.on_some_signal(handler)
             await ping()
 
             # now export and get the name
-            bus2.export('/test/path', service_interface)
+            await bus2.export('/test/path', service_interface)
             result = await bus2.request_name(well_known_name)
             assert result is RequestNameReply.PRIMARY_OWNER
 
             # the signal should work
-            service_interface.SomeSignal()
+            await service_interface.SomeSignal()
             await ping()
             assert counter == 1
             counter = 0
 
             # now queue up a transfer of the name
             service_interface2 = ExampleInterface()
-            bus3.export('/test/path', service_interface2)
+            await bus3.export('/test/path', service_interface2)
             result = await bus3.request_name(well_known_name)
             assert result is RequestNameReply.IN_QUEUE
 
             # if it doesn't own the name, the signal shouldn't work here
-            service_interface2.SomeSignal()
+            await service_interface2.SomeSignal()
             await ping()
             assert counter == 0
 
@@ -198,7 +198,7 @@ async def test_signals_with_changing_owners():
         # now transfer over the name and it should work
         await ping()
 
-        service_interface2.SomeSignal()
+        await service_interface2.SomeSignal()
         await ping()
         assert counter == 1
         counter = 0

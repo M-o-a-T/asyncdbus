@@ -189,7 +189,7 @@ class ProxyInterface:
         setattr(self, f'get_{snake_case}', property_getter)
         setattr(self, f'set_{snake_case}', property_setter)
 
-    def _message_handler(self, msg):
+    async def _message_handler(self, msg):
         if not msg._matches(
                 message_type=MessageType.SIGNAL, interface=self.introspection.name,
                 path=self.path) or msg.member not in self._signal_handlers:
@@ -215,17 +215,19 @@ class ProxyInterface:
 
         body = replace_idx_with_fds(msg.signature, msg.body, msg.unix_fds)
         for handler in self._signal_handlers[msg.member]:
-            handler(*body)
+            res = handler(*body)
+            if inspect.iscoroutine(res):
+                await res
 
     def _add_signal(self, intr_signal, interface):
-        def on_signal_fn(fn):
+        async def on_signal_fn(fn):
             fn_signature = inspect.signature(fn)
             if not callable(fn) or len(fn_signature.parameters) != len(intr_signal.args):
                 raise TypeError(
                     f'reply_notify must be a function with {len(intr_signal.args)} parameters')
 
             if not self._signal_handlers:
-                self.bus._add_match_rule(self._signal_match_rule)
+                await self.bus._add_match_rule(self._signal_match_rule)
                 self.bus.add_message_handler(self._message_handler)
 
             if intr_signal.name not in self._signal_handlers:
@@ -233,7 +235,7 @@ class ProxyInterface:
 
             self._signal_handlers[intr_signal.name].append(fn)
 
-        def off_signal_fn(fn):
+        async def off_signal_fn(fn):
             try:
                 i = self._signal_handlers[intr_signal.name].index(fn)
                 del self._signal_handlers[intr_signal.name][i]
@@ -243,7 +245,7 @@ class ProxyInterface:
                 return
 
             if not self._signal_handlers:
-                self.bus._remove_match_rule(self._signal_match_rule)
+                await self.bus._remove_match_rule(self._signal_match_rule)
                 self.bus.remove_message_handler(self._message_handler)
 
         snake_case = self._to_snake_case(intr_signal.name)
@@ -315,7 +317,7 @@ class ProxyObject:
         # lazy loaded by get_children()
         self._children = None
 
-    def get_interface(self, name: str) -> ProxyInterface:
+    async def get_interface(self, name: str) -> ProxyInterface:
         """Get an interface exported on this proxy object and connect it to the bus.
 
         :param name: The name of the interface to retrieve.
@@ -341,26 +343,21 @@ class ProxyObject:
         for intr_signal in intr_interface.signals:
             interface._add_signal(intr_signal, interface)
 
-        def get_owner_notify(msg, err):
-            if err:
-                logging.error(f'getting name owner for "{name}" failed, {err}')
-                return
-            if msg.message_type == MessageType.ERROR:
-                if msg.error_name != ErrorType.NAME_HAS_NO_OWNER.value:
-                    logging.error(f'getting name owner for "{name}" failed, {msg.body[0]}')
-                return
-
-            self.bus._name_owners[self.bus_name] = msg.body[0]
-
         if self.bus_name[0] != ':' and not self.bus._name_owners.get(self.bus_name, ''):
-            self.bus._call(
-                Message(
-                    destination='org.freedesktop.DBus',
-                    interface='org.freedesktop.DBus',
-                    path='/org/freedesktop/DBus',
-                    member='GetNameOwner',
-                    signature='s',
-                    body=[self.bus_name]), get_owner_notify)
+            try:
+                reply = await self.bus.call(
+                    Message(
+                        destination='org.freedesktop.DBus',
+                        interface='org.freedesktop.DBus',
+                        path='/org/freedesktop/DBus',
+                        member='GetNameOwner',
+                        signature='s',
+                        body=[self.bus_name]))
+            except DBusError as err:
+                if err.type != 'org.freedesktop.DBus.Error.NameHasNoOwner':
+                    raise
+            else:
+                self.bus._name_owners[self.bus_name] = reply.body[0]
 
         self._interfaces[name] = interface
         return interface

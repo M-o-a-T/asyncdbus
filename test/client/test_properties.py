@@ -37,12 +37,12 @@ class ExampleInterface(ServiceInterface):
 async def test_aio_properties():
     async with MessageBus().connect() as service_bus:
         service_interface = ExampleInterface()
-        service_bus.export('/test/path', service_interface)
+        await service_bus.export('/test/path', service_interface)
 
         async with MessageBus().connect() as bus:
-            obj = bus.get_proxy_object(service_bus.unique_name, '/test/path',
+            obj = await bus.get_proxy_object(service_bus.unique_name, '/test/path',
                                        service_bus._introspect_export_path('/test/path'))
-            interface = obj.get_interface(service_interface.name)
+            interface = await obj.get_interface(service_interface.name)
 
             prop = await interface.get_some_property()
             assert prop == service_interface._some_property

@@ -28,70 +28,6 @@ from copy import copy
 from typing import Type, Callable, Optional, Union
 
 
-@attr.s
-class ValueEvent:
-    """A waitable value useful for inter-task synchronization,
-    inspired by :class:`threading.Event`.
-        
-    An event object manages an internal value, which is initially
-    unset, and a task can wait for it to become True.
-
-    Note that the value can only be read once.
-    """
-
-    event = attr.ib(factory=anyio.create_event, init=False)
-    value = attr.ib(default=None, init=False)
-
-    def set(self, value):
-        """Set the result to return this value, and wake any waiting task."""
-        if self.value is not None:
-            return
-        self.value = outcome.Value(value)
-        self.event.set()
-
-    def set_error(self, exc):
-        """Set the result to raise this exception, and wake any waiting task."""
-        if self.value is not None:
-            return
-        self.value = outcome.Error(exc)
-        self.event.set()
-
-    set_result = set
-    set_exception = set_error
-
-    def is_set(self):
-        """Check whether the event has occurred."""
-        return self.value is not None
-
-    def cancel(self):
-        """Send a cancelation to the recipient.
-
-        TODO: Trio can't do that cleanly.
-        """
-        self.set_error(CancelledError())
-
-    async def get(self):
-        """Block until the value is set.
-
-        If it's already set, then this method returns immediately.
-
-        The value can only be read once.
-        """
-        await self.event.wait()
-        return self.value.unwrap()
-
-    def __await__(self):
-        return self.get().__await__()
-
-    def __call__(self, reply, err):
-        if self.is_set():
-            return
-        if err:
-            self.set_error(err)
-        else:
-            self.set(reply)
-
-
 class MessageBus:
     """The message bus implementation for use with anyio.
 
@@ -156,6 +92,7 @@ class MessageBus:
         self._reader = None
         self._writer = None
         self._tg = None
+        self._write_lock = anyio.create_lock()
 
         if auth is None:
             self._auth = AuthExternal()
@@ -168,7 +105,7 @@ class MessageBus:
             return False
         return True
 
-    def export(self, path: str, interface: ServiceInterface):
+    async def export(self, path: str, interface: ServiceInterface):
         """Export the service interface on this message bus to make it available
         to other clients.
 
@@ -197,9 +134,9 @@ class MessageBus:
 
         self._path_exports[path].append(interface)
         ServiceInterface._add_bus(interface, self)
-        self._emit_interface_added(path, interface)
+        await self._emit_interface_added(path, interface)
 
-    def unexport(self, path: str, interface: Optional[Union[ServiceInterface, str]] = None):
+    async def unexport(self, path: str, interface: Optional[Union[ServiceInterface, str]] = None):
         """Unexport the path or service interface to make it no longer
         available to clients.
 
@@ -244,7 +181,7 @@ class MessageBus:
                     if not self._has_interface(iface):
                         ServiceInterface._remove_bus(iface, self)
                     break
-        self._emit_interface_removed(path, removed_interfaces)
+        await self._emit_interface_removed(path, removed_interfaces)
 
     async def introspect(self, bus_name: str, path: str, timeout: float = 30) -> intr.Node:
         """Get introspection data for the node at the given path from the given
@@ -264,29 +201,18 @@ class MessageBus:
             - :class:`InvalidObjectPathError <asyncdbus.InvalidObjectPathError>` - If the given object path is not valid.
             - :class:`InvalidBusNameError <asyncdbus.InvalidBusNameError>` - If the given bus name is not valid.
         """
-        future = ValueEvent()
-
-        def reply_notify(reply, err):
-            try:
-                self._check_method_return(reply, err, 's')
-                result = intr.Node.parse(reply.body[0])
-            except Exception as e:
-                future.set_error(e)
-                return
-
-            future.set(result)
-
-        self._call(
-            Message(
-                destination=bus_name,
-                path=path,
-                interface='org.freedesktop.DBus.Introspectable',
-                member='Introspect'), reply_notify)
-
         with anyio.fail_after(timeout):
-            return await future
+            reply = await self.call(
+                Message(
+                    destination=bus_name,
+                    path=path,
+                    interface='org.freedesktop.DBus.Introspectable',
+                    member='Introspect'))
 
-    def _emit_interface_added(self, path, interface):
+        self._check_method_return(reply, None, 's')
+        return intr.Node.parse(reply.body[0])
+
+    async def _emit_interface_added(self, path, interface):
         """Emit the ``org.freedesktop.DBus.ObjectManager.InterfacesAdded`` signal.
 
         This signal is intended to be used to alert clients when
@@ -309,7 +235,7 @@ class MessageBus:
                 body[interface.name][prop.name] = Variant(prop.signature,
                                                           prop.prop_getter(interface))
 
-        self.send(
+        await self.send(
             Message.new_signal(
                 path=path,
                 interface='org.freedesktop.DBus.ObjectManager',
@@ -317,7 +243,7 @@ class MessageBus:
                 signature='oa{sa{sv}}',
                 body=[path, body]))
 
-    def _emit_interface_removed(self, path, removed_interfaces):
+    async def _emit_interface_removed(self, path, removed_interfaces):
         """Emit the ``org.freedesktop.DBus.ObjectManager.InterfacesRemoved` signal.
 
         This signal is intended to be used to alert clients when
@@ -331,7 +257,7 @@ class MessageBus:
         if self._disconnected:
             return
 
-        self.send(
+        await self.send(
             Message.new_signal(
                 path=path,
                 interface='org.freedesktop.DBus.ObjectManager',
@@ -355,31 +281,20 @@ class MessageBus:
         """
         assert_bus_name_valid(name)
 
-        future = ValueEvent()
-
-        def reply_notify(reply, err):
-            try:
-                self._check_method_return(reply, err, 'u')
-                result = RequestNameReply(reply.body[0])
-            except Exception as e:
-                future.set_error(e)
-                return
-
-            future.set(result)
-
         if type(flags) is not NameFlag:
             flags = NameFlag(flags)
 
-        self._call(
+        reply = await self.call(
             Message(
                 destination='org.freedesktop.DBus',
                 path='/org/freedesktop/DBus',
                 interface='org.freedesktop.DBus',
                 member='RequestName',
                 signature='su',
-                body=[name, flags]), reply_notify)
+                body=[name, flags]))
 
-        return await future
+        self._check_method_return(reply, None, 'u')
+        return RequestNameReply(reply.body[0])
 
     async def release_name(self, name: str):
         """Request that this message bus release the given name.
@@ -394,32 +309,22 @@ class MessageBus:
         :raises:
             - :class:`InvalidBusNameError <asyncdbus.InvalidBusNameError>` - If the given bus name is not valid.
         """
-        future = ValueEvent()
-
         assert_bus_name_valid(name)
 
-        def reply_notify(reply, err):
-            try:
-                self._check_method_return(reply, err, 'u')
-                result = ReleaseNameReply(reply.body[0])
-            except Exception as e:
-                future.set_error(e)
-                return
-
-            future.set(result)
-
-        self._call(
+        reply = await self.call(
             Message(
                 destination='org.freedesktop.DBus',
                 path='/org/freedesktop/DBus',
                 interface='org.freedesktop.DBus',
                 member='ReleaseName',
                 signature='s',
-                body=[name]), reply_notify)
+                body=[name]))
 
-        return await future
+        self._check_method_return(reply, None, 'u')
+        return ReleaseNameReply(reply.body[0])
 
-    def get_proxy_object(self, bus_name: str, path: str,
+
+    async def get_proxy_object(self, bus_name: str, path: str,
                          introspection: Union[intr.Node, str, ET.Element]) -> ProxyObject:
         """Get a proxy object for the path exported on the bus that owns the
         name. The object is expected to export the interfaces and nodes
@@ -446,7 +351,7 @@ class MessageBus:
         if self._ProxyObject is None:
             raise Exception('the message bus implementation did not provide a proxy object class')
 
-        self._init_high_level_client()
+        await self._init_high_level_client()
 
         return self._ProxyObject(bus_name, path, introspection, self)
 
@@ -497,14 +402,6 @@ class MessageBus:
                 del self._user_message_handlers[i]
                 break
 
-    def send(self, msg: Message) -> None:
-        """Asynchronously send a message on the message bus.
-
-        :param msg: The message to send.
-        :type msg: :class:`Message <asyncdbus.Message>`
-        """
-        raise NotImplementedError('the "send" method must be implemented in the inheriting class')
-
     async def _finalize(self):
         '''should be called after the socket disconnects with the disconnection
         error to clean up resources and put the bus in a disconnected state'''
@@ -533,7 +430,7 @@ class MessageBus:
         self._method_return_handlers.clear()
 
         for path in list(self._path_exports.keys()):
-            self.unexport(path)
+            await self.unexport(path)
 
         self._user_message_handlers.clear()
 
@@ -545,7 +442,7 @@ class MessageBus:
 
         return False
 
-    def _interface_signal_notify(self,
+    async def _interface_signal_notify(self,
                                  interface,
                                  interface_name,
                                  member,
@@ -561,7 +458,7 @@ class MessageBus:
         if path is None:
             raise Exception('Could not find interface on bus (this is a bug in dbus-next)')
 
-        self.send(
+        await self.send(
             Message.new_signal(
                 path=path,
                 interface=interface_name,
@@ -643,23 +540,48 @@ class MessageBus:
         if err:
             raise err
 
-    def _call(self, msg, callback):
-        self._check_callback_type(callback)
+    async def call(self, msg):
+        """Send a method call and wait for a reply from the DBus daemon.
 
-        if not msg.serial:
+        :param msg: The method call message to send.
+        :type msg: :class:`Message <asyncdbus.Message>`
+
+        :returns: A message in reply to the message sent. If the message does
+            not expect a reply based on the message flags or type, returns
+            ``None`` after the message is sent.
+        :rtype: :class:`Message <asyncdbus.Message>` or :class:`None` if no reply is expected.
+
+        :raises:
+            - :class:`Exception` - If a connection error occurred.
+        """
+        if msg.message_type is MessageType.METHOD_CALL and not msg.serial:
             msg.serial = self.next_serial()
 
+        if msg.flags & MessageFlag.NO_REPLY_EXPECTED or msg.message_type is not MessageType.METHOD_CALL:
+            await self.send(msg)
+            return
+
+        result = None
+        evt = anyio.create_event()
+
         def reply_notify(reply, err):
+            nonlocal result, evt
+            if err:
+                result = outcome.Error(err)
+            else:
+                result = outcome.Value(reply)
             if reply:
                 self._name_owners[msg.destination] = reply.sender
-            callback(reply, err)
+            evt.set()
 
-        self.send(msg)
-
-        if msg.flags & MessageFlag.NO_REPLY_EXPECTED:
-            callback(None, None)
-        else:
-            self._method_return_handlers[msg.serial] = reply_notify
+        self._method_return_handlers[msg.serial] = reply_notify
+        await self.send(msg)
+        await evt.wait()
+        res = result.unwrap()
+        if res:
+            self._name_owners[msg.destination] = res.sender
+        self._check_method_return(res)
+        return res
 
     @staticmethod
     def _check_callback_type(callback):
@@ -675,10 +597,10 @@ class MessageBus:
             raise TypeError(text)
 
     @staticmethod
-    def _check_method_return(msg, err, signature):
+    def _check_method_return(msg, err=None, signature=None):
         if err:
             raise err
-        elif msg.message_type == MessageType.METHOD_RETURN and msg.signature == signature:
+        elif msg.message_type == MessageType.METHOD_RETURN and (signature is None or msg.signature == signature):
             return
         elif msg.message_type == MessageType.ERROR:
             raise DBusError._from_message(msg)
@@ -703,7 +625,7 @@ class MessageBus:
                 if msg.flags & MessageFlag.NO_REPLY_EXPECTED:
                     return
 
-                bus.send(reply)
+                bus.send_soon(reply)
 
             def __exit__(self, exc_type, exc_value, tb):
                 if exc_type is None:
@@ -733,12 +655,12 @@ class MessageBus:
                     result = await result
                 if result:
                     if type(result) is Message:
-                        self.send(result)
+                        await self.send(result)
                     handled = True
                     break
             except DBusError as e:
                 if msg.message_type == MessageType.METHOD_CALL:
-                    self.send(e._as_message(msg))
+                    await self.send(e._as_message(msg))
                     handled = True
                     break
                 else:
@@ -748,7 +670,7 @@ class MessageBus:
                 logging.error(
                     f'A message handler raised an exception: {e}.\n{traceback.format_exc()}')
                 if msg.message_type == MessageType.METHOD_CALL:
-                    self.send(
+                    await self.send(
                         Message.new_error(
                             msg, ErrorType.INTERNAL_ERROR,
                             f'An internal error occurred: {e}.\n{traceback.format_exc()}'))
@@ -775,7 +697,9 @@ class MessageBus:
 
                 with send_reply:
                     if handler:
-                        handler(msg, send_reply)
+                        res = handler(msg, send_reply)
+                        if inspect.iscoroutine(res):
+                            res = await res
                     else:
                         send_reply(
                             Message.new_error(
@@ -840,30 +764,26 @@ class MessageBus:
     def _default_ping_handler(self, msg, send_reply):
         send_reply(Message.new_method_return(msg))
 
-    def _default_get_machine_id_handler(self, msg, send_reply):
+    async def _default_get_machine_id_handler(self, msg, send_reply):
         if self._machine_id:
             send_reply(Message.new_method_return(msg, 's', self._machine_id))
             return
 
-        def reply_handler(reply, err):
-            if err:
-                # the bus has been disconnected, cannot send a reply
-                return
-
+        try:
+            reply = await self.call(
+                Message(
+                    destination='org.freedesktop.DBus',
+                    path='/org/freedesktop/DBus',
+                    interface='org.freedesktop.DBus.Peer',
+                    member='GetMachineId'))
+        except DBusError as err:
+            send_reply(Message.new_error(msg, err.reply.error_name, err.reply.body))
+        else:
             if reply.message_type == MessageType.METHOD_RETURN:
                 self._machine_id = reply.body[0]
                 send_reply(Message.new_method_return(msg, 's', [self._machine_id]))
-            elif reply.message_type == MessageType.ERROR:
-                send_reply(Message.new_error(msg, reply.error_name, reply.body))
             else:
                 send_reply(Message.new_error(msg, ErrorType.FAILED, 'could not get machine_id'))
-
-        self._call(
-            Message(
-                destination='org.freedesktop.DBus',
-                path='/org/freedesktop/DBus',
-                interface='org.freedesktop.DBus.Peer',
-                member='GetMachineId'), reply_handler)
 
     def _default_get_managed_objects_handler(self, msg, send_reply):
         result = {}
@@ -970,7 +890,7 @@ class MessageBus:
 
         return result
 
-    def _init_high_level_client(self):
+    async def _init_high_level_client(self):
         '''The high level client is initialized when the first proxy object is
         gotten. Currently just sets up the match rules for the name owner cache
         so signals can be routed to the right objects.'''
@@ -978,25 +898,19 @@ class MessageBus:
             return
         self._high_level_client_initialized = True
 
-        def add_match_notify(msg, err):
-            if err:
-                logging.error(
-                    f'add match request failed. match="{self._name_owner_match_rule}", {err}')
-            if msg.message_type == MessageType.ERROR:
-                logging.error(
-                    f'add match request failed. match="{self._name_owner_match_rule}", {msg.body[0]}'
-                )
-
-        self._call(
+        msg = await self.call(
             Message(
                 destination='org.freedesktop.DBus',
                 interface='org.freedesktop.DBus',
                 path='/org/freedesktop/DBus',
                 member='AddMatch',
                 signature='s',
-                body=[self._name_owner_match_rule]), add_match_notify)
+                body=[self._name_owner_match_rule]))
 
-    def _add_match_rule(self, match_rule):
+        if msg.message_type == MessageType.ERROR:
+            raise DBusError._from_message(msg)
+
+    async def _add_match_rule(self, match_rule):
         '''Add a match rule. Match rules added by this function are refcounted
         and must be removed by _remove_match_rule(). This is for use in the
         high level client only.'''
@@ -1009,22 +923,16 @@ class MessageBus:
 
         self._match_rules[match_rule] = 1
 
-        def add_match_notify(msg, err):
-            if err:
-                logging.error(f'add match request failed. match="{match_rule}", {err}')
-            if msg.message_type == MessageType.ERROR:
-                logging.error(f'add match request failed. match="{match_rule}", {msg.body[0]}')
-
-        self._call(
+        await self.call(
             Message(
                 destination='org.freedesktop.DBus',
                 interface='org.freedesktop.DBus',
                 path='/org/freedesktop/DBus',
                 member='AddMatch',
                 signature='s',
-                body=[match_rule]), add_match_notify)
+                body=[match_rule]))
 
-    def _remove_match_rule(self, match_rule):
+    async def _remove_match_rule(self, match_rule):
         '''Remove a match rule added with _add_match_rule(). This is for use in
         the high level client only.'''
         if match_rule == self._name_owner_match_rule:
@@ -1037,20 +945,14 @@ class MessageBus:
 
         del self._match_rules[match_rule]
 
-        def remove_match_notify(msg, err):
-            if err:
-                logging.error(f'remove match request failed. match="{match_rule}", {err}')
-            elif msg.message_type == MessageType.ERROR:
-                logging.error(f'remove match request failed. match="{match_rule}", {msg.body[0]}')
-
-        self._call(
+        await self.call(
             Message(
                 destination='org.freedesktop.DBus',
                 interface='org.freedesktop.DBus',
                 path='/org/freedesktop/DBus',
                 member='RemoveMatch',
                 signature='s',
-                body=[match_rule]), remove_match_notify)
+                body=[match_rule]))
 
     async def _setup_socket_aio(self):
         err = None
@@ -1135,7 +1037,7 @@ class MessageBus:
         if not self._disconnected:
             raise RuntimeError("You can't connect twice")
         await self._setup_socket_aio()
-        future = ValueEvent()
+        evt = anyio.create_event()
 
         async with anyio.create_task_group() as tg:
             self._tg = tg
@@ -1145,13 +1047,10 @@ class MessageBus:
             self._reader = await tg.start(self._message_reader)
 
             def on_hello(reply, err):
-                try:
-                    if err:
-                        raise err
-                    self.unique_name = reply.body[0]
-                    future.set(self)
-                except Exception as e:
-                    future.set_error(e)
+                if err:
+                    raise err
+                self.unique_name = reply.body[0]
+                evt.set()
 
             hello_msg = Message(
                 destination='org.freedesktop.DBus',
@@ -1164,7 +1063,7 @@ class MessageBus:
             await anyio.wait_socket_writable(self._sock)
             self._sock.send(hello_msg._marshall())
 
-            await future
+            await evt.wait()
             self._writer = await tg.start(self._message_writer)
 
             self._disconnected = False
@@ -1175,48 +1074,40 @@ class MessageBus:
             tg.cancel_scope.cancel()
             pass  # close TG
 
-    async def call(self, msg: Message) -> Optional[Message]:
-        """Send a method call and wait for a reply from the DBus daemon.
-
-        :param msg: The method call message to send.
-        :type msg: :class:`Message <asyncdbus.Message>`
-
-        :returns: A message in reply to the message sent. If the message does
-            not expect a reply based on the message flags or type, returns
-            ``None`` after the message is sent.
-        :rtype: :class:`Message <asyncdbus.Message>` or :class:`None` if no reply is expected.
-
-        :raises:
-            - :class:`Exception` - If a connection error occurred.
-        """
-        if msg.flags & MessageFlag.NO_REPLY_EXPECTED or msg.message_type is not MessageType.METHOD_CALL:
-            await self.send(msg)
-            return None
-
-        future = ValueEvent()
-        self._call(msg, future)
-        return await future
-
-    def send(self, msg: Message):
+    async def send(self, msg: Message):
         """Asynchronously send a message on the message bus.
 
-        .. note:: This method may change to a couroutine function in the 1.0
-            release of the library.
+        This method is a coroutine which returns when the message is sent
+        successfully. Use `send_soon` if you need a sync version.
 
         :param msg: The message to send.
         :type msg: :class:`Message <asyncdbus.Message>`
 
-        :returns: A future that resolves when the message is sent or a
-            connection error occurs.
-        :rtype: :class:`ValueEvent`
+        :returns: Nothing.
         """
         if not msg.serial:
             msg.serial = self.next_serial()
 
-        future = ValueEvent()
-        self._schedule_write(msg, future)
+        await self._write_one(msg._marshall(negotiate_unix_fd=self._negotiate_unix_fd),
+                                 copy(msg.unix_fds))
 
-        return future
+    def send_soon(self, msg: Message):
+        """Queue a message on the message bus for transmission.
+
+        This method is not a coroutine and should not be used unless
+        absolutely necessary. An async version that waits for transmission
+        to be completed is `send`.
+
+        :param msg: The message to send.
+        :type msg: :class:`Message <asyncdbus.Message>`
+
+        :returns: Nothing.
+        """
+        if not msg.serial:
+            msg.serial = self.next_serial()
+
+        self._write.send_nowait((msg._marshall(negotiate_unix_fd=self._negotiate_unix_fd),
+                                 copy(msg.unix_fds)))
 
     def _make_method_handler(self, interface, method):
         async def handler(msg, send_reply):
@@ -1263,43 +1154,37 @@ class MessageBus:
                 unmarshaller.feed(data, aux)
 
                 for msg in unmarshaller:
-                    await self._on_message(msg)
+                    self._tg.spawn(self._on_message,msg)
 
     async def _message_writer(self, *, task_status):
         with anyio.open_cancel_scope() as sc:
             task_status.started(sc)
 
             async for msg in self._write_r:
+                buf, unix_fds = msg
+                await self._write_one(buf, unix_fds)
+
+    async def _write_one(self, buf, unix_fds):
+        async with self._write_lock:
+            if self._sock is None:
+                return # raise EOFError
+            buf = memoryview(buf)
+            done = 0
+            while done < len(buf) or (unix_fds and self._negotiate_unix_fd):
+                await anyio.wait_socket_writable(self._sock)
                 if self._sock is None:
-                    return
-                buf, unix_fds, fut = msg
-                buf = memoryview(buf)
-                done = 0
-                while done < len(buf) or (unix_fds and self._negotiate_unix_fd):
-                    await anyio.wait_socket_writable(self._sock)
-                    if self._sock is None:
-                        return
-                    if unix_fds and self._negotiate_unix_fd:
-                        ancdata = [(socket.SOL_SOCKET, socket.SCM_RIGHTS, array.array(
-                            "i", unix_fds))]
+                    raise EOFError
+                if unix_fds and self._negotiate_unix_fd:
+                    ancdata = [(socket.SOL_SOCKET, socket.SCM_RIGHTS, array.array(
+                        "i", unix_fds))]
 
-                        done2 = self._sock.sendmsg([buf[done:]], ancdata)
-                        unix_fds = None
-                    else:
-                        done2 = self._sock.send(buf[done:])
-                    if not done2:
-                        raise EOFError
-                    done += done2
-
-                fut.set(None)
-
-    def buffer_message(self, msg: Message, future=None):
-        self._write.send_nowait((msg._marshall(negotiate_unix_fd=self._negotiate_unix_fd),
-                                 copy(msg.unix_fds), future))
-
-    def _schedule_write(self, msg: Message = None, future=None):
-        if msg is not None:
-            self.buffer_message(msg, future)
+                    done2 = self._sock.sendmsg([buf[done:]], ancdata)
+                    unix_fds = None
+                else:
+                    done2 = self._sock.send(buf[done:])
+                if not done2:
+                    raise EOFError
+                done += done2
 
     async def _auth_readline(self):
         buf = b''

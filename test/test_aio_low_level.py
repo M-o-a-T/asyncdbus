@@ -1,6 +1,7 @@
-from asyncdbus import Message, MessageType, MessageFlag, MessageBus, ValueEvent
+from asyncdbus import Message, MessageType, MessageFlag, MessageBus, DBusError
 
 import pytest
+import anyio
 
 
 @pytest.mark.anyio
@@ -32,7 +33,9 @@ async def test_standard_interfaces():
         msg.member = 'MemberDoesNotExist'
         msg.serial = bus.next_serial()
 
-        reply = await bus.call(msg)
+        with pytest.raises(DBusError) as err:
+            await bus.call(msg)
+        reply = err.value.reply
         assert reply.message_type == MessageType.ERROR
         assert reply.reply_serial == msg.serial
         assert reply.error_name
@@ -52,13 +55,13 @@ async def test_sending_messages_between_buses():
             member='SomeMember',
             serial=bus2.next_serial())
 
-        def message_handler(sent):
+        async def message_handler(sent):
             if sent.sender == bus2.unique_name and sent.serial == msg.serial:
                 assert sent.path == msg.path
                 assert sent.serial == msg.serial
                 assert sent.interface == msg.interface
                 assert sent.member == msg.member
-                bus1.send(Message.new_method_return(sent, 's', ['got it']))
+                await bus1.send(Message.new_method_return(sent, 's', ['got it']))
                 bus1.remove_message_handler(message_handler)
                 return True
 
@@ -72,13 +75,13 @@ async def test_sending_messages_between_buses():
         assert reply.body == ['got it']
         assert reply.reply_serial == msg.serial
 
-        def message_handler_error(sent):
+        async def message_handler_error(sent):
             if sent.sender == bus2.unique_name and sent.serial == msg.serial:
                 assert sent.path == msg.path
                 assert sent.serial == msg.serial
                 assert sent.interface == msg.interface
                 assert sent.member == msg.member
-                bus1.send(Message.new_error(sent, 'org.test.Error', 'throwing an error'))
+                await bus1.send(Message.new_error(sent, 'org.test.Error', 'throwing an error'))
                 bus1.remove_message_handler(message_handler_error)
                 return True
 
@@ -86,7 +89,9 @@ async def test_sending_messages_between_buses():
 
         msg.serial = bus2.next_serial()
 
-        reply = await bus2.call(msg)
+        with pytest.raises(DBusError) as err:
+            await bus2.call(msg)
+        reply = err.value.reply
 
         assert reply.message_type == MessageType.ERROR
         assert reply.sender == bus1.unique_name
@@ -117,17 +122,21 @@ async def test_sending_signals_between_buses():
         await bus1.call(add_match_msg)
 
         async def wait_for_message():
-            future = ValueEvent()
+            sig = None
+            evt = anyio.create_event()
 
             def message_handler(signal):
+                nonlocal sig
                 if signal.sender == bus2.unique_name:
                     bus1.remove_message_handler(message_handler)
-                    future.set_result(signal)
+                    sig = signal
+                    evt.set()
 
             bus1.add_message_handler(message_handler)
-            return await future
+            await evt.wait()
+            return sig
 
-        bus2.send(
+        await bus2.send(
             Message.new_signal('/org/test/path', 'org.test.interface', 'SomeSignal', 's',
                                ['a signal']))
 

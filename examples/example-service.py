@@ -55,7 +55,7 @@ async def main():
 
     async with MessageBus().connect() as bus:
         interface = ExampleInterface(interface_name)
-        bus.export('/example/path', interface)
+        await bus.export('/example/path', interface)
         await bus.request_name(name)
         print(f'service up on name: "{name}", path: "{path}", interface: "{interface_name}"')
         await anyio.sleep(99999)

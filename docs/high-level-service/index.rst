@@ -80,7 +80,7 @@ If any file descriptors are sent or received (DBus type ``h``), the variable ref
     async def main():
         async with MessageBus().connect() as bus:
             interface = ExampleInterface()
-            bus.export('/com/example/sample0', interface)
+            await bus.export('/com/example/sample0', interface)
             await bus.request_name('com.example.name')
 
             # emit the changed signal after two seconds.

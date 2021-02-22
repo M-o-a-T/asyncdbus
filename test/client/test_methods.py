@@ -43,15 +43,15 @@ async def test_aio_proxy_object():
             MessageBus().connect() as bus2:
         await bus.request_name(bus_name)
         service_interface = ExampleInterface()
-        bus.export('/test/path', service_interface)
+        await bus.export('/test/path', service_interface)
         # add some more to test nodes
-        bus.export('/test/path/child1', ExampleInterface())
-        bus.export('/test/path/child2', ExampleInterface())
+        await bus.export('/test/path/child1', ExampleInterface())
+        await bus.export('/test/path/child2', ExampleInterface())
 
         introspection = await bus2.introspect(bus_name, '/test/path')
         assert type(introspection) is intr.Node
-        obj = bus2.get_proxy_object(bus_name, '/test/path', introspection)
-        interface = obj.get_interface(service_interface.name)
+        obj = await bus2.get_proxy_object(bus_name, '/test/path', introspection)
+        interface = await obj.get_interface(service_interface.name)
 
         children = obj.get_children()
         assert len(children) == 2

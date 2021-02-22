@@ -25,13 +25,13 @@ async def test_export_unexport():
     export_path2 = '/test/path/child'
 
     async with MessageBus().connect() as bus:
-        bus.export(export_path, interface)
+        await bus.export(export_path, interface)
         assert export_path in bus._path_exports
         assert len(bus._path_exports[export_path]) == 1
         assert bus._path_exports[export_path][0] is interface
         assert len(ServiceInterface._get_buses(interface)) == 1
 
-        bus.export(export_path2, interface2)
+        await bus.export(export_path2, interface2)
 
         node = bus._introspect_export_path(export_path)
         assert len(node.interfaces) == standard_interfaces_count + 1
@@ -39,22 +39,22 @@ async def test_export_unexport():
         # relative path
         assert node.nodes[0].name == 'child'
 
-        bus.unexport(export_path, interface)
+        await bus.unexport(export_path, interface)
         assert export_path not in bus._path_exports
         assert len(ServiceInterface._get_buses(interface)) == 0
 
-        bus.export(export_path2, interface)
+        await bus.export(export_path2, interface)
         assert len(bus._path_exports[export_path2]) == 2
 
         # test unexporting the whole path
-        bus.unexport(export_path2)
+        await bus.unexport(export_path2)
         assert not bus._path_exports
         assert not ServiceInterface._get_buses(interface)
         assert not ServiceInterface._get_buses(interface2)
 
         # test unexporting by name
-        bus.export(export_path, interface)
-        bus.unexport(export_path, interface.name)
+        await bus.export(export_path, interface)
+        await bus.unexport(export_path, interface.name)
         assert not bus._path_exports
         assert not ServiceInterface._get_buses(interface)
 
@@ -73,8 +73,8 @@ async def test_export_alias():
         export_path = '/test/path'
         export_path2 = '/test/path/child'
 
-        bus.export(export_path, interface)
-        bus.export(export_path2, interface)
+        await bus.export(export_path, interface)
+        await bus.export(export_path2, interface)
 
         result = await bus.call(
             Message(
@@ -106,8 +106,8 @@ async def test_export_introspection():
     export_path2 = '/test/path/child'
 
     async with MessageBus().connect() as bus:
-        bus.export(export_path, interface)
-        bus.export(export_path2, interface2)
+        await bus.export(export_path, interface)
+        await bus.export(export_path2, interface2)
 
         root = bus._introspect_export_path('/')
         assert len(root.nodes) == 1
