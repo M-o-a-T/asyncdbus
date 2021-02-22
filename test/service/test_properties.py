@@ -1,9 +1,11 @@
 from asyncdbus.service import ServiceInterface, dbus_property, method
 from asyncdbus import Message, MessageBus, MessageType, PropertyAccess, ErrorType, Variant, DBusError
+from asyncdbus.signature import Tuple, Str
 
 import pytest
 import anyio
 
+from asyncdbus.signature import Str,Array,Struct,Dict,Int64
 
 class ExampleInterface(ServiceInterface):
     def __init__(self, name):
@@ -15,47 +17,47 @@ class ExampleInterface(ServiceInterface):
         self._renamed_prop = '65'
 
     @dbus_property()
-    def string_prop(self) -> 's':
+    def string_prop(self) -> Str:
         return self._string_prop
 
     @string_prop.setter
-    def string_prop_setter(self, val: 's'):
+    def string_prop_setter(self, val: Str):
         self._string_prop = val
 
     @dbus_property(PropertyAccess.READ)
-    def readonly_prop(self) -> 't':
+    def readonly_prop(self) -> Int64:
         return self._readonly_prop
 
     @dbus_property()
-    def container_prop(self) -> 'a(ss)':
+    def container_prop(self) -> Array[Struct[Str,Str]]:
         return self._container_prop
 
     @container_prop.setter
-    def container_prop(self, val: 'a(ss)'):
+    def container_prop(self, val: Array[Struct[Str,Str]]):
         self._container_prop = val
 
     @dbus_property(name='renamed_prop')
-    def original_name(self) -> 's':
+    def original_name(self) -> Str:
         return self._renamed_prop
 
     @original_name.setter
-    def original_name_setter(self, val: 's'):
+    def original_name_setter(self, val: Str):
         self._renamed_prop = val
 
     @dbus_property(disabled=True)
-    def disabled_prop(self) -> 's':
+    def disabled_prop(self) -> Str:
         return self._disabled_prop
 
     @disabled_prop.setter
-    def disabled_prop(self, val: 's'):
+    def disabled_prop(self, val: Str):
         self._disabled_prop = val
 
     @dbus_property(disabled=True)
-    def throws_error(self) -> 's':
+    def throws_error(self) -> Str:
         raise DBusError('test.error', 'told you so')
 
     @throws_error.setter
-    def throws_error(self, val: 's'):
+    def throws_error(self, val: Str):
         raise DBusError('test.error', 'told you so')
 
     @method()
@@ -84,31 +86,31 @@ async def test_property_methods():
                     signature=signature,
                     body=body))
 
-        result = await call_properties('GetAll', 's', [interface.name])
+        result = await call_properties('GetAll', Str, [interface.name])
         assert result.message_type == MessageType.METHOD_RETURN, result.body[0]
         assert result.signature == 'a{sv}'
         assert result.body == [{
-            'string_prop': Variant('s', interface._string_prop),
-            'readonly_prop': Variant('t', interface._readonly_prop),
+            'string_prop': Variant(Str, interface._string_prop),
+            'readonly_prop': Variant(Int64, interface._readonly_prop),
             'container_prop': Variant('a(ss)', interface._container_prop),
-            'renamed_prop': Variant('s', interface._renamed_prop)
+            'renamed_prop': Variant(Str, interface._renamed_prop)
         }]
 
-        result = await call_properties('Get', 'ss', [interface.name, 'string_prop'])
+        result = await call_properties('Get', Tuple[Str,Str], [interface.name, 'string_prop'])
         assert result.message_type == MessageType.METHOD_RETURN, result.body[0]
         assert result.signature == 'v'
-        assert result.body == [Variant('s', 'hi')]
+        assert result.body == [Variant(Str, 'hi')]
 
         result = await call_properties(
             'Set', 'ssv',
-            [interface.name, 'string_prop', Variant('s', 'ho')])
+            [interface.name, 'string_prop', Variant(Str, 'ho')])
         assert result.message_type == MessageType.METHOD_RETURN, result.body[0]
         assert interface.string_prop == 'ho'
 
         with pytest.raises(DBusError) as err:
             await call_properties(
                 'Set', 'ssv',
-                [interface.name, 'readonly_prop', Variant('t', 100)])
+                [interface.name, 'readonly_prop', Variant(Int64, 100)])
         result = err.value.reply
         assert result.message_type == MessageType.ERROR, result.body[0]
         assert result.error_name == ErrorType.PROPERTY_READ_ONLY.value, result.body[0]
@@ -116,7 +118,7 @@ async def test_property_methods():
         with pytest.raises(DBusError) as err:
             result = await call_properties(
                 'Set', 'ssv',
-                [interface.name, 'disabled_prop', Variant('s', 'asdf')])
+                [interface.name, 'disabled_prop', Variant(Str, 'asdf')])
         result = err.value.reply
         assert result.message_type == MessageType.ERROR, result.body[0]
         assert result.error_name == ErrorType.UNKNOWN_PROPERTY.value
@@ -124,7 +126,7 @@ async def test_property_methods():
         with pytest.raises(DBusError) as err:
             await call_properties(
                 'Set', 'ssv',
-                [interface.name, 'not_a_prop', Variant('s', 'asdf')])
+                [interface.name, 'not_a_prop', Variant(Str, 'asdf')])
         result = err.value.reply
         assert result.message_type == MessageType.ERROR, result.body[0]
         assert result.error_name == ErrorType.UNKNOWN_PROPERTY.value
@@ -133,7 +135,7 @@ async def test_property_methods():
         with pytest.raises(DBusError) as err:
             await call_properties(
                 'Set', 'ssv',
-                [interface.name, 'string_prop', Variant('t', 100)])
+                [interface.name, 'string_prop', Variant(Int64, 100)])
         result = err.value.reply
         assert result.message_type == MessageType.ERROR
         assert result.error_name == ErrorType.INVALID_SIGNATURE.value
@@ -146,21 +148,21 @@ async def test_property_methods():
         with pytest.raises(DBusError) as err:
             await call_properties(
                 'Set', 'ssv',
-                [interface.name, 'throws_error', Variant('s', 'ho')])
+                [interface.name, 'throws_error', Variant(Str, 'ho')])
         result = err.value.reply
         assert result.message_type == MessageType.ERROR, result.body[0]
         assert result.error_name == 'test.error'
         assert result.body == ['told you so']
 
         with pytest.raises(DBusError) as err:
-            await call_properties('Get', 'ss', [interface.name, 'throws_error'])
+            await call_properties('Get', Tuple[Str,Str], [interface.name, 'throws_error'])
         result = err.value.reply
         assert result.message_type == MessageType.ERROR, result.body[0]
         assert result.error_name == 'test.error'
         assert result.body == ['told you so']
 
         with pytest.raises(DBusError) as err:
-            await call_properties('GetAll', 's', [interface.name])
+            await call_properties('GetAll', Str, [interface.name])
         result = err.value.reply
         assert result.message_type == MessageType.ERROR, result.body[0]
         assert result.error_name == 'test.error'
@@ -178,7 +180,7 @@ async def test_property_changed_signal():
                 path='/org/freedesktop/DBus',
                 interface='org.freedesktop.DBus',
                 member='AddMatch',
-                signature='s',
+                signature=Str,
                 body=[f'sender={bus1.unique_name}']))
 
         interface = ExampleInterface('test.interface')
@@ -214,6 +216,6 @@ async def test_property_changed_signal():
         assert signal.signature == 'sa{sv}as'
         assert signal.body == [
             interface.name, {
-                'string_prop': Variant('s', 'asdf')
+                'string_prop': Variant(Str, 'asdf')
             }, ['container_prop']
         ]

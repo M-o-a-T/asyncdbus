@@ -1,7 +1,7 @@
 from .validators import is_object_path_valid
 from .errors import InvalidSignatureError, SignatureBodyMismatchError
 
-from typing import Any, List, Union
+from typing import Any, List as _List, Union, Tuple as _Tuple, Dict as _Dict, Generic, TypeVar
 
 
 class SignatureType:
@@ -257,7 +257,7 @@ class SignatureType:
         """
         if body is None:
             raise SignatureBodyMismatchError('Cannot serialize Python type "None"')
-        elif self.token == 'y':
+        if self.token == 'y':
             self._verify_byte(body)
         elif self.token == 'b':
             self._verify_boolean(body)
@@ -315,6 +315,8 @@ class SignatureTree:
 
     @staticmethod
     def _get(signature: str = ''):
+        if hasattr(signature, 'tree'):
+            signature = signature.tree.signature
         if signature in SignatureTree._cache:
             return SignatureTree._cache[signature]
         SignatureTree._cache[signature] = SignatureTree(signature)
@@ -325,6 +327,8 @@ class SignatureTree:
 
         self.types = []
 
+        if hasattr(signature,'tree'):
+            signature = signature.tree.signature
         if len(signature) > 0xff:
             raise InvalidSignatureError('A signature must be less than 256 characters')
 
@@ -338,7 +342,7 @@ class SignatureTree:
         else:
             return super().__eq__(other)
 
-    def verify(self, body: List[Any]):
+    def verify(self, body: _List[Any]):
         """Verifies that the give body matches this signature tree
 
         :param body: the body to verify for this tree
@@ -361,7 +365,85 @@ class SignatureTree:
         return True
 
 
-class Variant:
+
+
+"""
+This module exports a collection of types suitable for assembling DBus signatures.
+
+You should use them instead of directly annotating your functions with DBus
+type strings because (a) they are more descriptive, (b) they are compatible
+with mypy.
+"""
+
+T = TypeVar('T')
+
+class Byte(int):
+    tree = SignatureTree._get('y')
+class Bool(int):
+    tree = SignatureTree._get('b')
+class Int16(int):
+    tree = SignatureTree._get('n')
+class UInt16(int):
+    tree = SignatureTree._get('q')
+class Int32(int):
+    tree = SignatureTree._get('i')
+class UInt32(int):
+    tree = SignatureTree._get('u')
+class Int64(int):
+    tree = SignatureTree._get('x')
+class UInt64(int):
+    tree = SignatureTree._get('t')
+class Double(float):
+    tree = SignatureTree._get('d')
+class UnixFD(int):
+    tree = SignatureTree._get('h')
+
+class Str(str):
+    tree = SignatureTree._get('s')
+class ObjPath(str):
+    tree = SignatureTree._get('o')
+class Signature(str):
+    tree = SignatureTree._get('g')
+
+class Var(Generic[T]):
+    tree = SignatureTree._get('v')
+class Empty(type):
+    tree = SignatureTree._get('')
+
+class Array(_List):
+    """A possibly-empty list of same-typed objects."""
+    def __class_getitem__(cls, key):
+        class Array_(_Tuple[key]):
+            tree = SignatureTree._get('a'+key.tree.signature)
+        return Array_
+
+class Tuple(_Tuple):
+    """A simple sequence of objects."""
+    def __class_getitem__(cls, key):
+        class Tuple_(_Tuple[key]):
+            tree = SignatureTree._get(''.join(sig.tree.signature for sig in key))
+        return Tuple_
+
+class Struct(_Tuple):
+    """An atomic sequence of objects."""
+    def __class_getitem__(cls, key):
+        k = [key] if isinstance(key, type) else key
+        class Struct_(_Tuple[key]):
+            tree = SignatureTree._get('('+''.join(sig.tree.signature for sig in k)+')')
+        return Struct_
+
+class Dict(_Dict):
+    def __class_getitem__(cls, key):
+        if len(key) != 2:
+            raise RuntimeError("dicts must have two subtypes (key+value)")
+        if len(key[0].tree.signature) != 1:
+            raise RuntimeError("dicts must have a primitive key")
+
+        class Dict_(_Tuple[key]):
+            tree = SignatureTree._get('{'+''.join(sig.tree.signature for sig in key)+'}')
+        return Dict_
+
+class Variant(Generic[T]):
     """A class to represent a DBus variant (type "v").
 
     This class is used in message bodies to represent variants. The user can
@@ -381,12 +463,14 @@ class Variant:
         :class:`InvalidSignatureError` if the signature is not valid.
         :class:`SignatureBodyMismatchError` if the signature does not match the body.
     """
+    tree = SignatureTree._get('v')
 
     def __init__(self, signature: Union[str, SignatureTree, SignatureType], value: Any):
         signature_str = ''
         signature_tree = None
         signature_type = None
 
+        signature = getattr(signature, 'tree', signature)
         if type(signature) is SignatureTree:
             signature_tree = signature
         elif type(signature) is SignatureType:

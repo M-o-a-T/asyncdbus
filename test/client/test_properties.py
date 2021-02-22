@@ -1,5 +1,6 @@
 from asyncdbus import Message, DBusError, MessageBus
 from asyncdbus.service import ServiceInterface, dbus_property, PropertyAccess
+from asyncdbus.signature import Str
 
 import pytest
 
@@ -13,11 +14,11 @@ class ExampleInterface(ServiceInterface):
         self._int64_property = -10000
 
     @dbus_property()
-    def SomeProperty(self) -> 's':
+    def SomeProperty(self) -> Str:
         return self._some_property
 
     @SomeProperty.setter
-    def SomeProperty(self, val: 's'):
+    def SomeProperty(self, val: Str):
         self._some_property = val
 
     @dbus_property(access=PropertyAccess.READ)
@@ -25,11 +26,11 @@ class ExampleInterface(ServiceInterface):
         return self._int64_property
 
     @dbus_property()
-    def ErrorThrowingProperty(self) -> 's':
+    def ErrorThrowingProperty(self) -> Str:
         raise DBusError(self.error_name, self.error_text)
 
     @ErrorThrowingProperty.setter
-    def ErrorThrowingProperty(self, val: 's'):
+    def ErrorThrowingProperty(self, val: Str):
         raise DBusError(self.error_name, self.error_text)
 
 

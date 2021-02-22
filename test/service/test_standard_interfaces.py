@@ -1,5 +1,5 @@
 from asyncdbus.service import ServiceInterface, dbus_property, PropertyAccess
-from asyncdbus.signature import Variant
+from asyncdbus.signature import Variant,Str,Var,Array,Empty,Byte,Tuple
 from asyncdbus.errors import DBusError
 from asyncdbus import Message, MessageBus, MessageType, introspection as intr
 from asyncdbus.constants import ErrorType
@@ -25,7 +25,7 @@ class ExampleComplexInterface(ServiceInterface):
         return self._foo
 
     @dbus_property(access=PropertyAccess.READ)
-    def Bar(self) -> 's':
+    def Bar(self) -> Str:
         return self._bar
 
 
@@ -49,7 +49,7 @@ async def test_introspectable_interface():
                 member='Introspect'))
 
         assert reply.message_type == MessageType.METHOD_RETURN, reply.body[0]
-        assert reply.signature == 's'
+        assert reply.signature == Str.tree.signature
         node = intr.Node.parse(reply.body[0])
         assert len(node.interfaces) == standard_interfaces_count + 2
         assert node.interfaces[-1].name == 'test.interface2'
@@ -64,7 +64,7 @@ async def test_introspectable_interface():
                 interface='org.freedesktop.DBus.Introspectable',
                 member='Introspect'))
         assert reply.message_type == MessageType.METHOD_RETURN, reply.body[0]
-        assert reply.signature == 's'
+        assert reply.signature == Str.tree.signature
         node = intr.Node.parse(reply.body[0])
         assert not node.interfaces
         assert not node.nodes
@@ -83,7 +83,7 @@ async def test_peer_interface():
                 member='Ping'))
 
         assert reply.message_type == MessageType.METHOD_RETURN, reply.body[0]
-        assert reply.signature == ''
+        assert reply.signature == Empty.tree.signature
 
         reply = await bus2.call(
             Message(
@@ -94,7 +94,7 @@ async def test_peer_interface():
                 signature=''))
 
         assert reply.message_type == MessageType.METHOD_RETURN, reply.body[0]
-        assert reply.signature == 's'
+        assert reply.signature == Str.tree.signature
 
 
 @pytest.mark.anyio
@@ -104,8 +104,8 @@ async def test_object_manager():
         expected_reply = {
             '/test/path/deeper': {
                 'test.interface2': {
-                    'Bar': Variant('s', 'str'),
-                    'Foo': Variant('y', 42)
+                    'Bar': Variant(Str, 'str'),
+                    'Foo': Variant(Byte, 42)
                 }
             }
         }
@@ -113,8 +113,8 @@ async def test_object_manager():
             '/test/path': {
                 'test.interface1': {},
                 'test.interface2': {
-                    'Bar': Variant('s', 'str'),
-                    'Foo': Variant('y', 42)
+                    'Bar': Variant(Str, 'str'),
+                    'Foo': Variant(Byte, 42)
                 }
             }
         }
@@ -181,7 +181,7 @@ async def test_standard_interface_properties():
                         path=export_path,
                         interface='org.freedesktop.DBus.Properties',
                         member='Get',
-                        signature='ss',
+                        signature=Tuple[Str,Str],
                         body=[iface, 'anything']))
             result = err.value.reply
             assert result.message_type is MessageType.ERROR
@@ -194,8 +194,8 @@ async def test_standard_interface_properties():
                         path=export_path,
                         interface='org.freedesktop.DBus.Properties',
                         member='Set',
-                        signature='ssv',
-                        body=[iface, 'anything', Variant('s', 'new thing')]))
+                        signature=Tuple[Str,Str,Var],
+                        body=[iface, 'anything', Variant(Str, 'new thing')]))
             result = err.value.reply
             assert result.message_type is MessageType.ERROR
             assert result.error_name == ErrorType.UNKNOWN_PROPERTY.value
@@ -206,7 +206,7 @@ async def test_standard_interface_properties():
                     path=export_path,
                     interface='org.freedesktop.DBus.Properties',
                     member='GetAll',
-                    signature='s',
+                    signature=Str,
                     body=[iface]))
             assert result.message_type is MessageType.METHOD_RETURN
             assert result.body == [{}]

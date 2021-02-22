@@ -5,7 +5,7 @@ from .constants import MessageType, ErrorType, MessageFlag
 from . import introspection as intr
 from .errors import DBusError, InterfaceNotFoundError
 from ._private.util import replace_idx_with_fds, replace_fds_with_idx
-from .signature import Variant
+from .signature import Variant, Str,Var,Tuple
 
 from typing import Type, Union, List
 import logging
@@ -105,6 +105,8 @@ class ProxyInterface:
 
     @staticmethod
     def _check_method_return(msg, signature=None):
+        if hasattr(signature,'tree'):
+            signature = signature.tree.signature
         if msg.message_type == MessageType.ERROR:
             raise DBusError._from_message(msg)
         elif msg.message_type != MessageType.METHOD_RETURN:
@@ -155,17 +157,20 @@ class ProxyInterface:
                     path=self.path,
                     interface='org.freedesktop.DBus.Properties',
                     member='Get',
-                    signature='ss',
+                    signature=Tuple[Str,Str],
                     body=[self.introspection.name, intr_property.name]))
 
-            self._check_method_return(msg, 'v')
+            self._check_method_return(msg, Var)
             variant = msg.body[0]
-            if variant.signature != intr_property.signature:
+            sig = intr_property.signature
+            if hasattr(sig,'tree'):
+                sig = sig.tree.signature
+            if variant.signature != sig:
                 raise DBusError(ErrorType.CLIENT_ERROR,
                                 f'property returned unexpected signature "{variant.signature}"',
                                 msg)
 
-            return replace_idx_with_fds('v', msg.body, msg.unix_fds)[0].value
+            return replace_idx_with_fds(Var, msg.body, msg.unix_fds)[0].value
 
         async def property_setter(val):
             variant = Variant(intr_property.signature, val)
@@ -179,7 +184,7 @@ class ProxyInterface:
                     path=self.path,
                     interface='org.freedesktop.DBus.Properties',
                     member='Set',
-                    signature='ssv',
+                    signature=Tuple[Str,Str,Var],
                     body=body,
                     unix_fds=unix_fds))
 

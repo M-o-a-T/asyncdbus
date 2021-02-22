@@ -233,8 +233,11 @@ class Message:
             fields.append([HeaderField.REPLY_SERIAL.value, Variant('u', self.reply_serial)])
         if self.destination:
             fields.append([HeaderField.DESTINATION.value, Variant('s', self.destination)])
-        if self.signature:
-            fields.append([HeaderField.SIGNATURE.value, Variant('g', self.signature)])
+        sig = self.signature
+        if sig:
+            if hasattr(sig,'tree'):
+                sig = sig.tree.signature
+            fields.append([HeaderField.SIGNATURE.value, Variant('g', sig)])
         if self.unix_fds and negotiate_unix_fd:
             fields.append([HeaderField.UNIX_FDS.value, Variant('u', len(self.unix_fds))])
 

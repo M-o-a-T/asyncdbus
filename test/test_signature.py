@@ -1,10 +1,21 @@
 from asyncdbus import SignatureTree, SignatureBodyMismatchError, Variant
 from asyncdbus._private.util import signature_contains_type
+from asyncdbus.signature import Str,Array,Struct,Dict,Int64
 
 import pytest
 
 
+def test_signatures():
+    assert Int64.tree.signature == 'x'
+    assert Str.tree.signature == 's'
+    assert Struct[Int64,Str].tree.signature == '(xs)'
+    assert Array[Struct[Int64,Str]].tree.signature == 'a(xs)'
+    assert Array[Dict[Str,Int64]].tree.signature == 'a{sx}'
+
+
 def assert_simple_type(signature, type_):
+    if hasattr(signature,'tree'):
+        signature = signature.tree.signature
     assert type_.token == signature
     assert type_.signature == signature
     assert len(type_.children) == 0
@@ -13,14 +24,14 @@ def assert_simple_type(signature, type_):
 def test_simple():
     tree = SignatureTree('s')
     assert len(tree.types) == 1
-    assert_simple_type('s', tree.types[0])
+    assert_simple_type(Str, tree.types[0])
 
 
 def test_multiple_simple():
     tree = SignatureTree('sss')
     assert len(tree.types) == 3
     for i in range(0, 3):
-        assert_simple_type('s', tree.types[i])
+        assert_simple_type(Str, tree.types[i])
 
 
 def test_array():
@@ -30,19 +41,19 @@ def test_array():
     assert child.signature == 'as'
     assert child.token == 'a'
     assert len(child.children) == 1
-    assert_simple_type('s', child.children[0])
+    assert_simple_type(Str, child.children[0])
 
 
 def test_array_multiple():
     tree = SignatureTree('asasass')
     assert len(tree.types) == 4
-    assert_simple_type('s', tree.types[3])
+    assert_simple_type(Str, tree.types[3])
     for i in range(0, 3):
         array_child = tree.types[i]
         assert array_child.token == 'a'
         assert array_child.signature == 'as'
         assert len(array_child.children) == 1
-        assert_simple_type('s', array_child.children[0])
+        assert_simple_type(Str, array_child.children[0])
 
 
 def test_array_nested():
@@ -56,7 +67,7 @@ def test_array_nested():
     assert nested_child.token == 'a'
     assert nested_child.signature == 'as'
     assert len(nested_child.children) == 1
-    assert_simple_type('s', nested_child.children[0])
+    assert_simple_type(Str, nested_child.children[0])
 
 
 def test_simple_struct():
@@ -66,7 +77,7 @@ def test_simple_struct():
     assert child.signature == '(sss)'
     assert len(child.children) == 3
     for i in range(0, 3):
-        assert_simple_type('s', child.children[i])
+        assert_simple_type(Str, child.children[i])
 
 
 def test_nested_struct():
@@ -76,17 +87,17 @@ def test_nested_struct():
     assert child.signature == '(s(s(s)))'
     assert child.token == '('
     assert len(child.children) == 2
-    assert_simple_type('s', child.children[0])
+    assert_simple_type(Str, child.children[0])
     first_nested = child.children[1]
     assert first_nested.token == '('
     assert first_nested.signature == '(s(s))'
     assert len(first_nested.children) == 2
-    assert_simple_type('s', first_nested.children[0])
+    assert_simple_type(Str, first_nested.children[0])
     second_nested = first_nested.children[1]
     assert second_nested.token == '('
     assert second_nested.signature == '(s)'
     assert len(second_nested.children) == 1
-    assert_simple_type('s', second_nested.children[0])
+    assert_simple_type(Str, second_nested.children[0])
 
 
 def test_struct_multiple():
@@ -97,7 +108,7 @@ def test_struct_multiple():
         assert child.token == '('
         assert child.signature == '(s)'
         assert len(child.children) == 1
-        assert_simple_type('s', child.children[0])
+        assert_simple_type(Str, child.children[0])
 
 
 def test_array_of_structs():
@@ -112,7 +123,7 @@ def test_array_of_structs():
     assert struct_child.signature == '(ss)'
     assert len(struct_child.children) == 2
     for i in range(0, 2):
-        assert_simple_type('s', struct_child.children[i])
+        assert_simple_type(Str, struct_child.children[i])
 
 
 def test_dict_simple():
@@ -126,8 +137,8 @@ def test_dict_simple():
     assert dict_child.token == '{'
     assert dict_child.signature == '{ss}'
     assert len(dict_child.children) == 2
-    assert_simple_type('s', dict_child.children[0])
-    assert_simple_type('s', dict_child.children[1])
+    assert_simple_type(Str, dict_child.children[0])
+    assert_simple_type(Str, dict_child.children[1])
 
 
 def test_dict_of_structs():
@@ -141,13 +152,13 @@ def test_dict_of_structs():
     assert dict_child.token == '{'
     assert dict_child.signature == '{s(ss)}'
     assert len(dict_child.children) == 2
-    assert_simple_type('s', dict_child.children[0])
+    assert_simple_type(Str, dict_child.children[0])
     struct_child = dict_child.children[1]
     assert struct_child.token == '('
     assert struct_child.signature == '(ss)'
     assert len(struct_child.children) == 2
     for i in range(0, 2):
-        assert_simple_type('s', struct_child.children[i])
+        assert_simple_type(Str, struct_child.children[i])
 
 
 def test_contains_type():
@@ -161,7 +172,7 @@ def test_contains_type():
     assert not signature_contains_type(tree, [[0]], 'u')
 
     tree = SignatureTree('av')
-    body = [[Variant('u', 0), Variant('i', 0), Variant('x', 0), Variant('v', Variant('s', 'hi'))]]
+    body = [[Variant('u', 0), Variant('i', 0), Variant('x', 0), Variant('v', Variant(Str, 'hi'))]]
     assert signature_contains_type(tree, body, 'u')
     assert signature_contains_type(tree, body, 'x')
     assert signature_contains_type(tree, body, 'v')

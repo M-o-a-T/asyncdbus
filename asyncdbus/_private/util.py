@@ -6,8 +6,12 @@ def signature_contains_type(signature: Union[str, SignatureTree], body: List[Any
                             token: str) -> bool:
     '''For a given signature and body, check to see if it contains any members
     with the given token'''
+    if hasattr(signature,'tree'):
+        signature = signature.tree.signature
     if type(signature) is str:
         signature = SignatureTree._get(signature)
+    else:
+        signature = getattr(signature, 'tree', signature)
 
     queue = []
     contains_variants = False
@@ -49,6 +53,8 @@ def replace_fds_with_idx(signature: Union[str, SignatureTree],
     format. Type 'h' refers directly to the fd in the body. Replace that with
     an index and return the corresponding list of unix fds that can be set on
     the Message'''
+    if hasattr(signature,'tree'):
+        signature = signature.tree.signature
     if type(signature) is str:
         signature = SignatureTree._get(signature)
 
@@ -74,6 +80,8 @@ def replace_idx_with_fds(signature: Union[str, SignatureTree], body: List[Any],
     '''Take the low level body format and return the high level body format.
     Type 'h' refers to an index in the unix_fds array. Replace those with the
     actual file descriptor or `None` if one does not exist.'''
+    if hasattr(signature,'tree'):
+        signature = signature.tree.signature
     if type(signature) is str:
         signature = SignatureTree._get(signature)
 

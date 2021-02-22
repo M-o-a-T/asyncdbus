@@ -1,5 +1,6 @@
 from asyncdbus.service import ServiceInterface, method
 from asyncdbus import Message, MessageBus, MessageType, ErrorType, Variant, SignatureTree, DBusError, MessageFlag
+from asyncdbus.signature import Str,Tuple,Array,Var,Struct,Dict,UInt64
 
 import pytest
 
@@ -9,18 +10,18 @@ class ExampleInterface(ServiceInterface):
         super().__init__(name)
 
     @method()
-    def echo(self, what: 's') -> 's':
+    def echo(self, what: Str) -> Str:
         assert type(self) is ExampleInterface
         return what
 
     @method()
-    def echo_multiple(self, what1: 's', what2: 's') -> 'ss':
+    def echo_multiple(self, what1: Str, what2: Str) -> Tuple[Str,Str]:
         assert type(self) is ExampleInterface
         return [what1, what2]
 
     @method()
-    def echo_containers(self, array: 'as', variant: 'v', dict_entries: 'a{sv}',
-                        struct: '(s(s(v)))') -> 'asva{sv}(s(s(v)))':
+    def echo_containers(self, array: Array[Str], variant: Var, dict_entries: Array[Dict[Str,Var]],
+            struct: Struct[Str,Struct[Str,Struct[Var]]]) -> Tuple[Array[Str],Var,Array[Dict[Str,Var]],Struct[Str,Struct[Str,Struct[Var]]]]:
         assert type(self) is ExampleInterface
         return [array, variant, dict_entries, struct]
 
@@ -55,12 +56,12 @@ class AsyncInterface(ServiceInterface):
         super().__init__(name)
 
     @method()
-    async def echo(self, what: 's') -> 's':
+    async def echo(self, what: Str) -> Str:
         assert type(self) is AsyncInterface
         return what
 
     @method()
-    async def echo_multiple(self, what1: 's', what2: 's') -> 'ss':
+    async def echo_multiple(self, what1: Str, what2: Str) -> Tuple[Str,Str]:
         assert type(self) is AsyncInterface
         return [what1, what2]
 
@@ -119,22 +120,22 @@ async def test_methods(interface_class):
         await bus1.export(export_path, interface)
 
         body = ['hello world']
-        reply = await call('echo', 's', body)
+        reply = await call('echo', Str, body)
 
         assert reply.message_type == MessageType.METHOD_RETURN, reply.body[0]
-        assert reply.signature == 's'
+        assert reply.signature == Str.tree.signature
         assert reply.body == body
 
         body = ['hello', 'world']
-        reply = await call('echo_multiple', 'ss', body)
+        reply = await call('echo_multiple', Tuple[Str,Str], body)
         assert reply.message_type == MessageType.METHOD_RETURN, reply.body[0]
-        assert reply.signature == 'ss'
+        assert reply.signature == Tuple[Str,Str].tree.signature
         assert reply.body == body
 
         body = [['hello', 'world'],
-                Variant('v', Variant('(ss)', ['hello', 'world'])), {
-                    'foo': Variant('t', 100)
-                }, ['one', ['two', [Variant('s', 'three')]]]]
+                Variant('v', Variant(Struct[Str,Str], ['hello', 'world'])), {
+                    'foo': Variant(UInt64, 100)
+                }, ['one', ['two', [Variant(Str, 'three')]]]]
         signature = 'asva{sv}(s(s(v)))'
         SignatureTree(signature).verify(body)
         reply = await call('echo_containers', signature, body)

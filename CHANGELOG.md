@@ -11,7 +11,9 @@ This version forks the library and converts it to anyio.
 * error replies now raise `DBusError`
 * several methods are now async: they wait for the reply
   and may raise an error
-
+* Add explicit typing for DBus signatures
+  This should, at least in principle, allow compatibility with mypy and
+  similar type checkers.
 
 # Changelog for dbus-next
 

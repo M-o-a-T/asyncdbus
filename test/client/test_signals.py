@@ -2,6 +2,7 @@ from asyncdbus.service import ServiceInterface, signal
 from asyncdbus import Message, MessageBus
 from asyncdbus.introspection import Node
 from asyncdbus.constants import RequestNameReply
+from asyncdbus.signature import Str, Tuple
 
 import pytest
 
@@ -11,11 +12,11 @@ class ExampleInterface(ServiceInterface):
         super().__init__('test.interface')
 
     @signal()
-    def SomeSignal(self) -> 's':
+    def SomeSignal(self) -> Str:
         return 'hello'
 
     @signal()
-    def SignalMultiple(self) -> 'ss':
+    def SignalMultiple(self) -> Tuple[Str,Str]:
         return ['hello', 'world']
 
 

@@ -22,7 +22,7 @@ A class method decorated with ``@method()`` or ``@dbus_property()`` may throw a 
 
 After the service interface is defined, call :func:`MessageBus.export() <asyncdbus.message_bus.BaseMessageBus.export>` on a connected message bus and the service will be made available on the given object path.
 
-If any file descriptors are sent or received (DBus type ``h``), the variable refers to the file descriptor itself. You are responsible for closing any file descriptors sent or received by the bus. You must set the ``negotiate_unix_fd`` flag to ``True`` in the ``MessageBus`` constructor to use unix file descriptors.
+If any file descriptors are sent or received (DBus type `UnixFD` or ``h``), the variable refers to the file descriptor itself. You are responsible for closing any file descriptors sent or received by the bus. You must set the ``negotiate_unix_fd`` flag to ``True`` in the ``MessageBus`` constructor to use unix file descriptors.
 
 :example:
 
@@ -32,6 +32,7 @@ If any file descriptors are sent or received (DBus type ``h``), the variable ref
     from asyncdbus.service import (ServiceInterface,
                                    method, dbus_property, signal)
     from asyncdbus import Variant, DBusError
+    from asyncdbus.signature import Str,Int32,Byte,Bool,Array,Struct,UInt32
 
     import anyio
 
@@ -41,7 +42,7 @@ If any file descriptors are sent or received (DBus type ``h``), the variable ref
             self._bar = 105
 
         @method()
-        def Frobate(self, foo: 'i', bar: 's') -> 'a{us}':
+        def Frobate(self, foo: Int32, bar: Str) -> 'a{us}':
             print(f'called Frobate with foo={foo} and bar={bar}')
 
             return {
@@ -50,26 +51,26 @@ If any file descriptors are sent or received (DBus type ``h``), the variable ref
             }
 
         @method()
-        async def Bazify(self, bar: '(iiu)') -> 'vv':
+        async def Bazify(self, bar: Struct[Int32,Int32,UInt32]) -> Tuple[Var,Var]:
             print(f'called Bazify with bar={bar}')
 
-            return [Variant('s', 'example'), Variant('s', 'bazify')]
+            return [Variant(Str, 'example'), Variant(Str, 'bazify')]
 
         @method()
-        def Mogrify(self, bar: '(iiav)'):
+        def Mogrify(self, bar: Struct[Int32,Int32,Array[Var]]):
             raise DBusError('com.example.error.CannotMogrify',
                             'it is not possible to mogrify')
 
         @signal()
-        def Changed(self) -> 'b':
+        def Changed(self) -> Bool:
             return True
 
         @dbus_property()
-        def Bar(self) -> 'y':
+        def Bar(self) -> Byte:
             return self._bar
 
         @Bar.setter
-        def Bar(self, val: 'y'):
+        def Bar(self, val: Byte):
             if self._bar == val:
                 return
 

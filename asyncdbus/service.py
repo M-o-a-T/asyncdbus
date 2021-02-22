@@ -36,7 +36,10 @@ class _Method:
                 raise ValueError(
                     'method parameters must specify the dbus type string as an annotation')
             in_args.append(intr.Arg(param.annotation, intr.ArgDirection.IN, param.name))
-            in_signature += param.annotation
+            sig = param.annotation
+            if hasattr(sig, 'tree'):
+                sig = sig.tree.signature
+            in_signature += sig
 
         out_args = []
         if inspection.return_annotation is not inspect.Signature.empty:

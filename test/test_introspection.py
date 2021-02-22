@@ -1,4 +1,5 @@
 from asyncdbus import introspection as intr, ArgDirection, PropertyAccess, SignatureType
+from asyncdbus.signature import Str, Int32
 
 import os
 
@@ -33,7 +34,7 @@ def test_example_introspection_from_xml():
     assert type(foo) is intr.Arg
     assert foo.name == 'foo'
     assert foo.direction == ArgDirection.IN
-    assert foo.signature == 'i'
+    assert foo.signature == Int32.tree.signature
     assert type(foo.type) is SignatureType
     assert foo.type.token == 'i'
 
@@ -41,7 +42,7 @@ def test_example_introspection_from_xml():
     assert type(bar) is intr.Arg
     assert bar.name == 'bar'
     assert bar.direction == ArgDirection.OUT
-    assert bar.signature == 's'
+    assert bar.signature == Str.tree.signature
     assert type(bar.type) is SignatureType
     assert bar.type.token == 's'
 

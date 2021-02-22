@@ -2,6 +2,7 @@ from asyncdbus.message import MessageFlag
 from asyncdbus.service import ServiceInterface, method
 import asyncdbus.introspection as intr
 from asyncdbus import MessageBus, DBusError, ProxyObject
+from asyncdbus.signature import Str, Tuple
 
 import pytest
 
@@ -19,15 +20,15 @@ class ExampleInterface(ServiceInterface):
         return what
 
     @method()
-    def EchoString(self, what: 's') -> 's':
+    def EchoString(self, what: Str) -> Str:
         return what
 
     @method()
-    def ConcatStrings(self, what1: 's', what2: 's') -> 's':
+    def ConcatStrings(self, what1: Str, what2: Str) -> Str:
         return what1 + what2
 
     @method()
-    def EchoThree(self, what1: 's', what2: 's', what3: 's') -> 'sss':
+    def EchoThree(self, what1: Str, what2: Str, what3: Str) -> Tuple[Str,Str,Str]:
         return [what1, what2, what3]
 
     @method()

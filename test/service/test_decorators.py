@@ -1,5 +1,6 @@
 from asyncdbus import PropertyAccess, introspection as intr
 from asyncdbus.service import ServiceInterface, method, signal, dbus_property
+from asyncdbus.signature import Str, Tuple
 
 
 class ExampleInterface(ServiceInterface):
@@ -10,7 +11,7 @@ class ExampleInterface(ServiceInterface):
         self._weird_prop = 500
 
     @method()
-    def some_method(self, one: 's', two: 's') -> 's':
+    def some_method(self, one: Str, two: Str) -> Str:
         return 'hello'
 
     @method(name='renamed_method', disabled=True)
@@ -67,8 +68,8 @@ def test_method_decorator():
 
     method = methods[1]
     assert method.name == 'some_method'
-    assert method.in_signature == 'ss'
-    assert method.out_signature == 's'
+    assert method.in_signature == Tuple[Str,Str].tree.signature
+    assert method.out_signature == Str
     assert not method.disabled
     assert type(method.introspection) is intr.Method
 

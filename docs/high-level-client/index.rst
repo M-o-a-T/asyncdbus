@@ -42,7 +42,7 @@ The proxy object is obtained by the :class:`MessageBus <asyncdbus.message_bus.Ba
 
 Once you have a proxy object, use the :func:`get_proxy_interface() <asyncdbus.proxy_object.BaseProxyObject.get_interface>` method to create an interface passing the name of the interface to get. Each message bus has its own implementation of the proxy interface which behaves slightly differently. This is an example of how to use a proxy interface for the async :class:`MessageBus <asyncdbus.MessageBus>`.
 
-If any file descriptors are sent or received (DBus type ``h``), the variable refers to the file descriptor itself. You are responsible for closing any file descriptors sent or received by the bus. You must set the ``negotiate_unix_fd`` flag to ``True`` in the ``MessageBus`` constructor to use unix file descriptors.
+If any file descriptors are sent or received (DBus type `UnixFD` or ``h``), the variable refers to the file descriptor itself. You are responsible for closing any file descriptors sent or received by the bus. You must set the ``negotiate_unix_fd`` flag to ``True`` in the ``MessageBus`` constructor to use unix file descriptors.
 
 :example:
 
@@ -50,6 +50,7 @@ If any file descriptors are sent or received (DBus type ``h``), the variable ref
 
     from asyncdbus import MessageBus
     from asyncdbus import Variant
+    from asyncdbus.signature import Str
 
     async with MessageBus().connect() as bus:
 
@@ -75,7 +76,7 @@ If any file descriptors are sent or received (DBus type ``h``), the variable ref
         # `bar` will be a Variant.
         bar = await interface.call_bazify([-5, 5, 5])
 
-        await interface.call_mogrify([5, 5, [ Variant('s', 'foo') ])
+        await interface.call_mogrify([5, 5, [ Variant(Str, 'foo') ])
 
         # Listen to signals by defining a callback that takes the args 
         # specified by the signal definition and registering it on the

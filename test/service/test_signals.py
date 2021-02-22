@@ -1,7 +1,7 @@
 from asyncdbus.service import ServiceInterface, signal, SignalDisabledError, dbus_property
 from asyncdbus import Message, MessageType, MessageBus
 from asyncdbus.constants import PropertyAccess
-from asyncdbus.signature import Variant
+from asyncdbus.signature import Variant, Array, Int32, Str, Tuple, Empty, Var, Dict, ObjPath
 
 import pytest
 import anyio
@@ -18,12 +18,12 @@ class ExampleInterface(ServiceInterface):
         assert type(self) is ExampleInterface
 
     @signal()
-    def signal_simple(self) -> 's':
+    def signal_simple(self) -> Str:
         assert type(self) is ExampleInterface
         return 'hello'
 
     @signal()
-    def signal_multiple(self) -> 'ss':
+    def signal_multiple(self) -> Tuple[Str,Str]:
         assert type(self) is ExampleInterface
         return ['hello', 'world']
 
@@ -36,7 +36,7 @@ class ExampleInterface(ServiceInterface):
         assert type(self) is ExampleInterface
 
     @dbus_property(access=PropertyAccess.READ)
-    def test_prop(self) -> 'i':
+    def test_prop(self) -> Int32:
         return 42
 
 
@@ -45,11 +45,11 @@ class SecondExampleInterface(ServiceInterface):
         super().__init__(name)
 
     @dbus_property(access=PropertyAccess.READ)
-    def str_prop(self) -> 's':
+    def str_prop(self) -> Str:
         return "abc"
 
     @dbus_property(access=PropertyAccess.READ)
-    def list_prop(self) -> 'ai':
+    def list_prop(self) -> Array[Int32]:
         return [1, 2, 3]
 
 
@@ -108,7 +108,7 @@ def assert_signal_ok(signal, export_path, member, signature, body):
     assert signal.message_type == MessageType.SIGNAL
     assert signal.path == export_path
     assert signal.member == member
-    assert signal.signature == signature
+    assert signal.signature == signature.tree.signature
     assert signal.body == body
 
 
@@ -127,7 +127,7 @@ async def test_signals():
                 path='/org/freedesktop/DBus',
                 interface='org.freedesktop.DBus',
                 member='AddMatch',
-                signature='s',
+                signature=Str,
                 body=[f'sender={bus1.unique_name}']))
 
         async with ExpectMessage(bus1, bus2, interface.name) as expected_signal:
@@ -136,7 +136,7 @@ async def test_signals():
                 signal=await expected_signal,
                 export_path=export_path,
                 member='signal_empty',
-                signature='',
+                signature=Empty,
                 body=[])
 
         async with ExpectMessage(bus1, bus2, interface.name) as expected_signal:
@@ -145,7 +145,7 @@ async def test_signals():
                 signal=await expected_signal,
                 export_path=export_path,
                 member='renamed',
-                signature='',
+                signature=Empty,
                 body=[])
 
         async with ExpectMessage(bus1, bus2, interface.name) as expected_signal:
@@ -154,7 +154,7 @@ async def test_signals():
                 signal=await expected_signal,
                 export_path=export_path,
                 member='signal_simple',
-                signature='s',
+                signature=Str,
                 body=['hello'])
 
         async with ExpectMessage(bus1, bus2, interface.name) as expected_signal:
@@ -163,7 +163,7 @@ async def test_signals():
                 signal=await expected_signal,
                 export_path=export_path,
                 member='signal_multiple',
-                signature='ss',
+                signature=Tuple[Str,Str],
                 body=['hello', 'world'])
 
         with pytest.raises(SignalDisabledError):
@@ -181,7 +181,7 @@ async def test_interface_add_remove_signal():
                 path='/org/freedesktop/DBus',
                 interface='org.freedesktop.DBus',
                 member='AddMatch',
-                signature='s',
+                signature=Str,
                 body=[f'sender={bus1.unique_name}']))
 
         first_interface = ExampleInterface('test.interface.first')
@@ -196,7 +196,7 @@ async def test_interface_add_remove_signal():
                 signal=await expected_signal,
                 export_path=export_path,
                 member='InterfacesAdded',
-                signature='oa{sa{sv}}',
+                signature=Tuple[ObjPath,Array[Dict[Str,Array[Dict[Str,Var]]]]],
                 body=[export_path, {
                     'test.interface.first': {
                         'test_prop': Variant('i', 42)
@@ -211,13 +211,13 @@ async def test_interface_add_remove_signal():
                 signal=await expected_signal,
                 export_path=export_path,
                 member='InterfacesAdded',
-                signature='oa{sa{sv}}',
+                signature=Tuple[ObjPath,Array[Dict[Str,Array[Dict[Str,Var]]]]],
                 body=[
                     export_path,
                     {
                         'test.interface.second': {
-                            'str_prop': Variant('s', "abc"),
-                            'list_prop': Variant('ai', [1, 2, 3])
+                            'str_prop': Variant(Str, "abc"),
+                            'list_prop': Variant(Array[Int32], [1, 2, 3])
                         }
                     }
                 ])
@@ -230,7 +230,7 @@ async def test_interface_add_remove_signal():
                 signal=await expected_signal,
                 export_path=export_path,
                 member='InterfacesRemoved',
-                signature='oas',
+                signature=Tuple[ObjPath,Array[Str]],
                 body=[export_path, ['test.interface.second']])
 
         # add second interface again
@@ -247,5 +247,5 @@ async def test_interface_add_remove_signal():
                 signal=await expected_signal,
                 export_path=export_path,
                 member='InterfacesRemoved',
-                signature='oas',
+                signature=Tuple[ObjPath,Array[Str]],
                 body=[export_path, ['test.interface.first', 'test.interface.second']])

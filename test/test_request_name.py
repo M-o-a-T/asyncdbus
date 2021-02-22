@@ -1,4 +1,5 @@
 from asyncdbus import Message, MessageBus, MessageType, NameFlag, RequestNameReply, ReleaseNameReply
+from asyncdbus.signature import Str
 
 import pytest
 
@@ -17,7 +18,7 @@ async def test_name_requests():
                     path='/org/freedesktop/DBus',
                     interface='org.freedesktop.DBus',
                     member='GetNameOwner',
-                    signature='s',
+                    signature=Str,
                     body=[name]))
 
             assert reply.message_type == MessageType.METHOD_RETURN

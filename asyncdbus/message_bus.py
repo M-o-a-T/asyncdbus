@@ -864,7 +864,10 @@ class MessageBus:
                 if not prop.access.writable():
                     raise DBusError(ErrorType.PROPERTY_READ_ONLY, 'the property is readonly')
                 value = msg.body[2]
-                if value.signature != prop.signature:
+                sig = prop.signature
+                if hasattr(sig,'tree'):
+                    sig = sig.tree.signature
+                if value.signature != sig:
                     raise DBusError(ErrorType.INVALID_SIGNATURE,
                                     f'wrong signature for property. expected "{prop.signature}"')
                 assert prop.prop_setter

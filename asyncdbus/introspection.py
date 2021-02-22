@@ -11,6 +11,13 @@ import xml.etree.ElementTree as ET
 # TODO annotations
 
 
+def _sig(arg):
+    s = arg.signature
+    if hasattr(s, 'tree'):
+        s = s.tree.signature
+    return s
+
+
 class Arg:
     """A class that represents an input or output argument to a signal or a method.
 
@@ -37,6 +44,9 @@ class Arg:
             assert_member_name_valid(name)
 
         type_ = None
+        if hasattr(signature,'tree'):
+            signature = signature.tree.signature
+
         if type(signature) is SignatureType:
             type_ = signature
             signature = signature.signature
@@ -83,7 +93,10 @@ class Arg:
 
         if self.direction:
             element.set('direction', self.direction.value)
-        element.set('type', self.signature)
+        sig = self.signature
+        if hasattr(sig, 'tree'):
+            sig = sig.tree.signature
+        element.set('type', sig)
 
         return element
 
@@ -108,7 +121,7 @@ class Signal:
 
         self.name = name
         self.args = args or []
-        self.signature = ''.join(arg.signature for arg in self.args)
+        self.signature = ''.join(_sig(arg) for arg in self.args)
 
     def from_xml(element):
         """Convert an :class:`xml.etree.ElementTree.Element` to a :class:`Signal`.
@@ -172,8 +185,8 @@ class Method:
         self.name = name
         self.in_args = in_args
         self.out_args = out_args
-        self.in_signature = ''.join(arg.signature for arg in in_args)
-        self.out_signature = ''.join(arg.signature for arg in out_args)
+        self.in_signature = ''.join(_sig(arg) for arg in in_args)
+        self.out_signature = ''.join(_sig(arg) for arg in out_args)
 
     def from_xml(element: ET.Element) -> 'Method':
         """Convert an :class:`xml.etree.ElementTree.Element` to a :class:`Method`.
@@ -243,6 +256,8 @@ class Property:
                  access: PropertyAccess = PropertyAccess.READWRITE):
         assert_member_name_valid(name)
 
+        if hasattr(signature,'tree'):
+            signature = signature.tree.signature
         tree = SignatureTree._get(signature)
         if len(tree.types) != 1:
             raise InvalidIntrospectionError(
@@ -280,7 +295,7 @@ class Property:
         """
         element = ET.Element('property')
         element.set('name', self.name)
-        element.set('type', self.signature)
+        element.set('type', _sig(self))
         element.set('access', self.access.value)
         return element
 
