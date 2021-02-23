@@ -538,4 +538,4 @@ class Variant(Generic[T]):
             return super().__eq__(other)
 
     def __repr__(self):
-        return "<asyncdbus.signature.Variant(%r, %r)>" % (self.type.signature, self.value)
+        return "Variant(%r, %r)" % (self.type.signature, self.value)
