@@ -396,10 +396,7 @@ class MessageBus:
         :param handler: A message handler.
         :type handler: :class:`Callable`
         """
-        for i, h in enumerate(self._user_message_handlers):
-            if h == handler:
-                del self._user_message_handlers[i]
-                break
+        self._user_message_handlers.remove(handler)
 
     async def _finalize(self):
         '''should be called after the socket disconnects with the disconnection
