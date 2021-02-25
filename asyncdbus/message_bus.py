@@ -605,11 +605,7 @@ class MessageBus:
             raise DBusError(ErrorType.INTERNAL_ERROR, 'invalid message type for method call', msg)
 
     async def _on_message(self, msg):
-        try:
-            await self._process_message(msg)
-        except Exception as e:
-            logging.error(
-                f'got unexpected error processing a message: {e}.\n{traceback.format_exc()}')
+        await self._process_message(msg)
 
     def _send_reply(self, msg):
         bus = self
@@ -659,20 +655,15 @@ class MessageBus:
                 if msg.message_type == MessageType.METHOD_CALL:
                     await self.send(e._as_message(msg))
                     handled = True
-                    break
-                else:
-                    logging.error(
-                        f'A message handler raised an exception: {e}.\n{traceback.format_exc()}')
+                raise
             except Exception as e:
-                logging.error(
-                    f'A message handler raised an exception: {e}.\n{traceback.format_exc()}')
                 if msg.message_type == MessageType.METHOD_CALL:
                     await self.send(
                         Message.new_error(
                             msg, ErrorType.INTERNAL_ERROR,
                             f'An internal error occurred: {e}.\n{traceback.format_exc()}'))
                     handled = True
-                    break
+                raise
 
         if msg.message_type == MessageType.SIGNAL:
             if msg._matches(
