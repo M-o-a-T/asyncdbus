@@ -8,6 +8,36 @@ mode.
 
 This library is available on PyPi as [asyncdbus](https://pypi.org/project/asyncdbus/).
 
+## Installation
+
+You need the upcoming (3.0) version of AnyIO, which is not yet in PyPi.
+
+If you are not familiar how to install a python package directly from github, try `pipenv`:
+
+1. Install pipenv
+   ```bash
+   sudo apt install pipenv         # on debian/ubuntu
+   sudo dnf install pipenv         # on fedora
+   pkg install py36-pipenv         # FreeBSD
+   pip install pipenv              # others
+   ```
+
+2. Create virtual environment and install packages
+   ```bash
+   cd /your/project/directory
+   pipenv install
+   # the following calls might take a while
+   # especially on a raspberry pi or similar platforms
+   pipenv install -e git+https://github.com/agronholm/anyio@master#egg=anyio
+   pipenv install asyncdbus
+   ```
+   You might want to install additional packages for your project in this environment using `pipenv` instead of `pip`.
+
+3. Enter the environment **(you have to do this everytime you want to run or develop)**
+   ```bash
+   pipenv shell
+   ```
+
 The rest of this document is from dbus-next and has not been modified.
 
 # python-dbus-next
