@@ -1126,7 +1126,7 @@ class MessageBus:
                 send_reply(Message.new_method_return(msg, method.out_signature, body, fds))
 
         def _handler(msg, send_reply):
-            self._tg.spawn(handler, msg, send_reply)
+            self._tg.start_soon(handler, msg, send_reply)
 
         return _handler
 
@@ -1145,7 +1145,7 @@ class MessageBus:
                 unmarshaller.feed(data, aux)
 
                 for msg in unmarshaller:
-                    self._tg.spawn(self._on_message, msg)
+                    self._tg.start_soon(self._on_message, msg)
 
     async def _message_writer(self, *, task_status):
         with anyio.open_cancel_scope() as sc:
