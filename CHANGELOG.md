@@ -17,6 +17,17 @@ This version forks the library and converts it to anyio.
 
 # Changelog for dbus-next
 
+## Version 0.2.3
+
+This version contains some bugfixes and new features.
+
+* Include py.typed in Manifest.in (#79)
+* Fix property validation error message (#81)
+* Don't log errors if call failed after disconnect (#84)
+* Support PEP563 annotations (#3)
+* Service: support async properties (#86)
+* Client: Support coroutines as signal handlers (#2)
+
 ## Version 0.2.2
 
 This version contains some bugfixes and a new feature

@@ -1,5 +1,5 @@
 from asyncdbus import PropertyAccess, introspection as intr
-from asyncdbus.service import ServiceInterface, method, signal, dbus_property
+from asyncdbus.service import method, signal, dbus_property, ServiceInterface
 from asyncdbus.signature import Str, Tuple
 
 

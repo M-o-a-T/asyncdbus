@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import sys
 import os
+
 sys.path.append(os.path.abspath(os.path.dirname(__file__) + '/..'))
 
 from asyncdbus.service import ServiceInterface, method, signal, dbus_property

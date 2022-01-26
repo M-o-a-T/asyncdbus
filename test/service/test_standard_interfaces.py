@@ -18,6 +18,7 @@ class ExampleComplexInterface(ServiceInterface):
     def __init__(self, name):
         self._foo = 42
         self._bar = 'str'
+        self._async_prop = 'async'
         super().__init__(name)
 
     @dbus_property(access=PropertyAccess.READ)
@@ -27,6 +28,10 @@ class ExampleComplexInterface(ServiceInterface):
     @dbus_property(access=PropertyAccess.READ)
     def Bar(self) -> Str:
         return self._bar
+
+    @dbus_property(access=PropertyAccess.READ)
+    async def AsyncProp(self) -> 's':
+        return self._async_prop
 
 
 @pytest.mark.anyio
@@ -106,15 +111,18 @@ async def test_object_manager():
                 'test.interface2': {
                     'Bar': Variant(Str, 'str'),
                     'Foo': Variant(Byte, 42)
+                    'AsyncProp': Variant('s', 'async'),
                 }
             }
         }
+
         reply_ext = {
             '/test/path': {
                 'test.interface1': {},
                 'test.interface2': {
                     'Bar': Variant(Str, 'str'),
                     'Foo': Variant(Byte, 42)
+                    'AsyncProp': Variant('s', 'async'),
                 }
             }
         }
