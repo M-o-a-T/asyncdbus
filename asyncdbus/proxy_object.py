@@ -7,7 +7,7 @@ from .errors import DBusError, InterfaceNotFoundError
 from ._private.util import replace_idx_with_fds, replace_fds_with_idx
 from .signature import Variant, Str, Var, Tuple
 
-from typing import Type, Union, List
+from typing import Type, Union, List, Coroutine
 import logging
 import xml.etree.ElementTree as ET
 import inspect

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import sys
 import os
+
 sys.path.append(os.path.abspath(os.path.dirname(__file__) + '/..'))
 
 from asyncdbus.service import ServiceInterface, method, signal, dbus_property
@@ -16,8 +17,8 @@ class ExampleInterface(ServiceInterface):
         self._string_prop = 'kevin'
 
     @method()
-    def Echo(self, what: 's') -> 's':
-        return what
+    async def Echo(self, what: 's') -> 'ss':
+        return ["This is the echo", what]
 
     @method()
     def EchoMultiple(self, what1: 's', what2: 's') -> 'ss':

@@ -15,8 +15,10 @@ async def test_tcp_connection_with_forwarding():
 
         addr_info = parse_address(os.environ.get('DBUS_SESSION_BUS_ADDRESS'))
         assert addr_info
-        assert 'abstract' in addr_info[0][1]
-        path = f'\0{addr_info[0][1]["abstract"]}'
+        if 'abstract' in addr_info[0][1]:
+            path = f'\0{addr_info[0][1]["abstract"]}'
+        else:
+            path = addr_info[0][1]["path"]
 
         async def handle_connection(tcp_sock):
             async with await anyio.connect_unix(path) as unix_sock:
@@ -38,11 +40,11 @@ async def test_tcp_connection_with_forwarding():
                         except (anyio.ClosedResourceError, anyio.EndOfStream):
                             return
 
-                    tg.spawn(handle_read)
-                    tg.spawn(handle_write)
+                    tg.start_soon(handle_read)
+                    tg.start_soon(handle_write)
 
         listener = await anyio.create_tcp_listener(local_port=port, local_host=host)
-        tg.spawn(listener.serve, handle_connection)
+        tg.start_soon(listener.serve, handle_connection)
         await anyio.sleep(0.1)
 
         try:

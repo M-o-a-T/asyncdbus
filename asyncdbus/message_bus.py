@@ -9,7 +9,6 @@ from .errors import DBusError, InvalidAddressError
 from .signature import Variant
 from .proxy_object import ProxyObject
 from . import introspection as intr
-from contextlib import suppress
 from .auth import Authenticator, AuthExternal
 
 import inspect
@@ -89,10 +88,8 @@ class MessageBus:
         # anyio support
         self._negotiate_unix_fd = negotiate_unix_fd
 
-        self._reader = None
-        self._writer = None
         self._tg = None
-        self._write_lock = anyio.create_lock()
+        self._write_lock = anyio.Lock()
 
         if auth is None:
             self._auth = AuthExternal()
@@ -209,7 +206,7 @@ class MessageBus:
                     interface='org.freedesktop.DBus.Introspectable',
                     member='Introspect'))
 
-        self._check_method_return(reply, None, 's')
+        self._check_method_return(reply, 's')
         return intr.Node.parse(reply.body[0])
 
     async def _emit_interface_added(self, path, interface):
@@ -227,21 +224,16 @@ class MessageBus:
         if self._disconnected:
             return
 
-        body = {interface.name: {}}
-        properties = interface._get_properties(interface)
-
-        for prop in properties:
-            with suppress(Exception):
-                body[interface.name][prop.name] = Variant(prop.signature,
-                                                          prop.prop_getter(interface))
+        result = await ServiceInterface._get_all_property_values(interface)
+        body = {interface.name: result}
 
         await self.send(
-            Message.new_signal(
-                path=path,
-                interface='org.freedesktop.DBus.ObjectManager',
-                member='InterfacesAdded',
-                signature='oa{sa{sv}}',
-                body=[path, body]))
+            Message.new_signal(path=path,
+                                interface='org.freedesktop.DBus.ObjectManager',
+                                member='InterfacesAdded',
+                                signature='oa{sa{sv}}',
+                                body=[path, body]))
+
 
     async def _emit_interface_removed(self, path, removed_interfaces):
         """Emit the ``org.freedesktop.DBus.ObjectManager.InterfacesRemoved` signal.
@@ -293,7 +285,7 @@ class MessageBus:
                 signature='su',
                 body=[name, flags]))
 
-        self._check_method_return(reply, None, 'u')
+        self._check_method_return(reply, 'u')
         return RequestNameReply(reply.body[0])
 
     async def release_name(self, name: str):
@@ -320,7 +312,7 @@ class MessageBus:
                 signature='s',
                 body=[name]))
 
-        self._check_method_return(reply, None, 'u')
+        self._check_method_return(reply, 'u')
         return ReleaseNameReply(reply.body[0])
 
     async def get_proxy_object(self, bus_name: str, path: str,
@@ -396,10 +388,7 @@ class MessageBus:
         :param handler: A message handler.
         :type handler: :class:`Callable`
         """
-        for i, h in enumerate(self._user_message_handlers):
-            if h == handler:
-                del self._user_message_handlers[i]
-                break
+        self._user_message_handlers.remove(handler)
 
     async def _finalize(self):
         '''should be called after the socket disconnects with the disconnection
@@ -409,13 +398,8 @@ class MessageBus:
 
         self._disconnected = True
 
-        if self._reader is not None:
-            self._reader.cancel()
-        if self._writer is not None:
-            self._writer.cancel()
         if self._tg is not None:
             self._tg.cancel_scope.cancel()
-        self._write = None
 
         sock, self._sock = self._sock, None
         sock.close()
@@ -553,15 +537,16 @@ class MessageBus:
         :raises:
             - :class:`Exception` - If a connection error occurred.
         """
-        if msg.message_type is MessageType.METHOD_CALL and not msg.serial:
-            msg.serial = self.next_serial()
 
         if msg.flags & MessageFlag.NO_REPLY_EXPECTED or msg.message_type is not MessageType.METHOD_CALL:
             await self.send(msg)
             return
 
+        if not msg.serial:
+            msg.serial = self.next_serial()
+
         result = None
-        evt = anyio.create_event()
+        evt = anyio.Event()
 
         def reply_notify(reply, err):
             nonlocal result, evt
@@ -577,8 +562,6 @@ class MessageBus:
         await self.send(msg)
         await evt.wait()
         res = result.unwrap()
-        if res:
-            self._name_owners[msg.destination] = res.sender
         self._check_method_return(res)
         return res
 
@@ -596,10 +579,8 @@ class MessageBus:
             raise TypeError(text)
 
     @staticmethod
-    def _check_method_return(msg, err=None, signature=None):
-        if err:
-            raise err
-        elif msg.message_type == MessageType.METHOD_RETURN and (signature is None
+    def _check_method_return(msg, signature=None):
+        if msg.message_type == MessageType.METHOD_RETURN and (signature is None
                                                                 or msg.signature == signature):
             return
         elif msg.message_type == MessageType.ERROR:
@@ -608,40 +589,42 @@ class MessageBus:
             raise DBusError(ErrorType.INTERNAL_ERROR, 'invalid message type for method call', msg)
 
     async def _on_message(self, msg):
-        try:
-            await self._process_message(msg)
-        except Exception as e:
-            logging.error(
-                f'got unexpected error processing a message: {e}.\n{traceback.format_exc()}')
+        await self._process_message(msg)
 
     def _send_reply(self, msg):
         bus = self
 
         class SendReply:
-            def __enter__(self):
+            async def __aenter__(self):
                 return self
 
-            def __call__(self, reply):
+            async def __call__(self, reply):
                 if msg.flags & MessageFlag.NO_REPLY_EXPECTED:
                     return
 
-                bus.send_soon(reply)
+                await bus.send(reply)
 
-            def __exit__(self, exc_type, exc_value, tb):
+            async def _exit(self, exc_type, exc_value, tb):
                 if exc_type is None:
                     return
 
                 if issubclass(exc_type, DBusError):
-                    self(exc_value._as_message(msg))
+                    await self(exc_value._as_message(msg))
                     return True
 
                 if issubclass(exc_type, Exception):
-                    self(
+                    await self(
                         Message.new_error(
                             msg, ErrorType.SERVICE_ERROR,
                             f'The service interface raised an error: {exc_value}.\n{traceback.format_tb(tb)}'
                         ))
                     return True
+
+            async def __aexit__(self, exc_type, exc_value, tb):
+                return await self._exit(exc_type, exc_value, tb)
+
+            async def send_error(self, exc):
+                await self._exit(exc.__class__, exc, exc.__traceback__)
 
         return SendReply()
 
@@ -663,12 +646,8 @@ class MessageBus:
                     await self.send(e._as_message(msg))
                     handled = True
                     break
-                else:
-                    logging.error(
-                        f'A message handler raised an exception: {e}.\n{traceback.format_exc()}')
+                raise
             except Exception as e:
-                logging.error(
-                    f'A message handler raised an exception: {e}.\n{traceback.format_exc()}')
                 if msg.message_type == MessageType.METHOD_CALL:
                     await self.send(
                         Message.new_error(
@@ -676,6 +655,7 @@ class MessageBus:
                             f'An internal error occurred: {e}.\n{traceback.format_exc()}'))
                     handled = True
                     break
+                raise
 
         if msg.message_type == MessageType.SIGNAL:
             if msg._matches(
@@ -695,13 +675,13 @@ class MessageBus:
 
                 send_reply = self._send_reply(msg)
 
-                with send_reply:
+                async with send_reply:
                     if handler:
                         res = handler(msg, send_reply)
                         if inspect.iscoroutine(res):
                             res = await res
                     else:
-                        send_reply(
+                        await send_reply(
                             Message.new_error(
                                 msg, ErrorType.UNKNOWN_METHOD,
                                 f'{msg.interface}.{msg.member} with signature "{msg.signature}" could not be found'
@@ -709,20 +689,22 @@ class MessageBus:
 
         else:
             # An ERROR or a METHOD_RETURN
-            if msg.reply_serial in self._method_return_handlers:
+            try:
+                handler = self._method_return_handlers.pop(msg.reply_serial)
+            except KeyError:
+                pass
+            else:
                 if not handled:
-                    handler = self._method_return_handlers[msg.reply_serial]
                     handler(msg, None)
-                del self._method_return_handlers[msg.reply_serial]
 
     @staticmethod
     def _make_method_handler(interface, method):
-        def handler(msg, send_reply):
+        async def handler(msg, send_reply):
             args = ServiceInterface._msg_body_to_args(msg)
             result = method.fn(interface, *args)
             body, fds = ServiceInterface._fn_result_to_body(
                 result, signature_tree=method.out_signature_tree)
-            send_reply(Message.new_method_return(msg, method.out_signature, body, fds))
+            await send_reply(Message.new_method_return(msg, method.out_signature, body, fds))
 
         return handler
 
@@ -757,16 +739,16 @@ class MessageBus:
 
         return None
 
-    def _default_introspect_handler(self, msg, send_reply):
+    async def _default_introspect_handler(self, msg, send_reply):
         introspection = self._introspect_export_path(msg.path).tostring()
-        send_reply(Message.new_method_return(msg, 's', [introspection]))
+        await send_reply(Message.new_method_return(msg, 's', [introspection]))
 
-    def _default_ping_handler(self, msg, send_reply):
-        send_reply(Message.new_method_return(msg))
+    async def _default_ping_handler(self, msg, send_reply):
+        await send_reply(Message.new_method_return(msg))
 
     async def _default_get_machine_id_handler(self, msg, send_reply):
         if self._machine_id:
-            send_reply(Message.new_method_return(msg, 's', self._machine_id))
+            await send_reply(Message.new_method_return(msg, 's', self._machine_id))
             return
 
         try:
@@ -777,28 +759,38 @@ class MessageBus:
                     interface='org.freedesktop.DBus.Peer',
                     member='GetMachineId'))
         except DBusError as err:
-            send_reply(Message.new_error(msg, err.reply.error_name, err.reply.body))
+            await send_reply(Message.new_error(msg, err.reply.error_name, err.reply.body))
         else:
             if reply.message_type == MessageType.METHOD_RETURN:
                 self._machine_id = reply.body[0]
-                send_reply(Message.new_method_return(msg, 's', [self._machine_id]))
+                await send_reply(Message.new_method_return(msg, 's', [self._machine_id]))
             else:
-                send_reply(Message.new_error(msg, ErrorType.FAILED, 'could not get machine_id'))
+                await send_reply(Message.new_error(msg, ErrorType.FAILED, 'could not get machine_id'))
 
-    def _default_get_managed_objects_handler(self, msg, send_reply):
+    async def _default_get_managed_objects_handler(self, msg, send_reply):
         result = {}
+        result_signature = 'a{oa{sa{sv}}}'
+        error_handled = False
+
+        def is_result_complete():
+            if not result:
+                return True
+            for n, interfaces in result.items():
+                for value in interfaces.values():
+                    if value is None:
+                        return False
+
+            return True
 
         for node in self._path_exports:
-            if not node.startswith(msg.path + '/') and msg.path != '/':
+            if msg.path != '/' and not node.startswith(msg.path + '/'):
                 continue
-
             result[node] = {}
             for interface in self._path_exports[node]:
-                result[node][interface.name] = self._get_all_properties(interface)
+                result[node][interface.name] = await ServiceInterface._get_all_property_values(interface)
+        await send_reply(Message.new_method_return(msg, result_signature, [result]))
 
-        send_reply(Message.new_method_return(msg, 'a{oa{sa{sv}}}', [result]))
-
-    def _default_properties_handler(self, msg, send_reply):
+    async def _default_properties_handler(self, msg, send_reply):
         methods = {'Get': 'ss', 'Set': 'ssv', 'GetAll': 's'}
         if msg.member not in methods or methods[msg.member] != msg.signature:
             raise DBusError(
@@ -829,7 +821,7 @@ class MessageBus:
                         ErrorType.UNKNOWN_PROPERTY,
                         f'interface "{interface_name}" does not have property "{prop_name}"')
                 elif msg.member == 'GetAll':
-                    send_reply(Message.new_method_return(msg, 'a{sv}', [{}]))
+                    await send_reply(Message.new_method_return(msg, 'a{sv}', [{}]))
                     return
                 else:
                     assert False
@@ -853,13 +845,15 @@ class MessageBus:
                 if not prop.access.readable():
                     raise DBusError(ErrorType.UNKNOWN_PROPERTY,
                                     'the property does not have read access')
-                prop_value = getattr(interface, prop.prop_getter.__name__)
 
+                prop_value = await ServiceInterface._get_property_value(interface, prop)
                 body, unix_fds = replace_fds_with_idx(prop.signature, [prop_value])
 
-                send_reply(
-                    Message.new_method_return(
-                        msg, 'v', [Variant(prop.signature, body[0])], unix_fds=unix_fds))
+                await send_reply(
+                    Message.new_method_return(msg,
+                                                'v', [Variant(prop.signature, body[0])],
+                                                unix_fds=unix_fds))
+
             elif msg.member == 'Set':
                 if not prop.access.writable():
                     raise DBusError(ErrorType.PROPERTY_READ_ONLY, 'the property is readonly')
@@ -871,27 +865,18 @@ class MessageBus:
                     raise DBusError(ErrorType.INVALID_SIGNATURE,
                                     f'wrong signature for property. expected "{prop.signature}"')
                 assert prop.prop_setter
+
                 body = replace_idx_with_fds(value.signature, [value.value], msg.unix_fds)
-                setattr(interface, prop.prop_setter.__name__, body[0])
-                send_reply(Message.new_method_return(msg))
+                await ServiceInterface._set_property_value(interface, prop, body[0])
+                await send_reply(Message.new_method_return(msg))
 
         elif msg.member == 'GetAll':
-            body, unix_fds = replace_fds_with_idx('a{sv}', [self._get_all_properties(interface)])
-            send_reply(Message.new_method_return(msg, 'a{sv}', body, unix_fds=unix_fds))
+            values = await ServiceInterface._get_all_property_values(interface)
+            body, unix_fds = replace_fds_with_idx('a{sv}', [values])
+            await send_reply(Message.new_method_return(msg, 'a{sv}', body, unix_fds=unix_fds))
 
         else:
             assert False
-
-    def _get_all_properties(self, interface):
-        result = {}
-
-        for prop in ServiceInterface._get_properties(interface):
-            if prop.disabled or not prop.access.readable():
-                continue
-            result[prop.name] = Variant(prop.signature, getattr(interface,
-                                                                prop.prop_getter.__name__))
-
-        return result
 
     async def _init_high_level_client(self):
         '''The high level client is initialized when the first proxy object is
@@ -1040,34 +1025,22 @@ class MessageBus:
         if not self._disconnected:
             raise RuntimeError("You can't connect twice")
         await self._setup_socket_aio()
-        evt = anyio.create_event()
+        evt = anyio.Event()
 
         async with anyio.create_task_group() as tg:
             self._tg = tg
             await self._authenticate()
 
-            self._write, self._write_r = anyio.create_memory_object_stream(10)
-            self._reader = await tg.start(self._message_reader)
-
-            def on_hello(reply, err):
-                if err:
-                    raise err
-                self.unique_name = reply.body[0]
-                evt.set()
+            await tg.start(self._message_reader)
 
             hello_msg = Message(
                 destination='org.freedesktop.DBus',
                 path='/org/freedesktop/DBus',
                 interface='org.freedesktop.DBus',
-                member='Hello',
-                serial=self.next_serial())
+                member='Hello')
 
-            self._method_return_handlers[hello_msg.serial] = on_hello
-            await anyio.wait_socket_writable(self._sock)
-            self._sock.send(hello_msg._marshall())
-
-            await evt.wait()
-            self._writer = await tg.start(self._message_writer)
+            res = await self.call(hello_msg)
+            self.unique_name = res.body[0]
 
             self._disconnected = False
             try:
@@ -1081,7 +1054,7 @@ class MessageBus:
         """Asynchronously send a message on the message bus.
 
         This method is a coroutine which returns when the message is sent
-        successfully. Use `send_soon` if you need a sync version.
+        successfully.
 
         :param msg: The message to send.
         :type msg: :class:`Message <asyncdbus.Message>`
@@ -1094,24 +1067,6 @@ class MessageBus:
         await self._write_one(
             msg._marshall(negotiate_unix_fd=self._negotiate_unix_fd), copy(msg.unix_fds))
 
-    def send_soon(self, msg: Message):
-        """Queue a message on the message bus for transmission.
-
-        This method is not a coroutine and should not be used unless
-        absolutely necessary. An async version that waits for transmission
-        to be completed is `send`.
-
-        :param msg: The message to send.
-        :type msg: :class:`Message <asyncdbus.Message>`
-
-        :returns: Nothing.
-        """
-        if not msg.serial:
-            msg.serial = self.next_serial()
-
-        self._write.send_nowait((msg._marshall(negotiate_unix_fd=self._negotiate_unix_fd),
-                                 copy(msg.unix_fds)))
-
     def _make_method_handler(self, interface, method):
         async def handler(msg, send_reply):
             args = ServiceInterface._msg_body_to_args(msg)
@@ -1123,49 +1078,40 @@ class MessageBus:
             except DBusError as e:
                 if msg.message_type != MessageType.METHOD_CALL:
                     raise
-                send_reply(e._as_message(msg))
+                await send_reply(e._as_message(msg))
 
             except Exception as e:
                 if msg.message_type != MessageType.METHOD_CALL:
                     raise
-                send_reply(
+                await send_reply(
                     Message.new_error(
                         msg, ErrorType.SERVICE_ERROR,
                         f'An internal error occurred: {e}.\n{traceback.format_exc()}'))
             else:
                 body, fds = ServiceInterface._fn_result_to_body(
                     result, signature_tree=method.out_signature_tree)
-                send_reply(Message.new_method_return(msg, method.out_signature, body, fds))
+                await send_reply(Message.new_method_return(msg, method.out_signature, body, fds))
 
         def _handler(msg, send_reply):
-            self._tg.spawn(handler, msg, send_reply)
+            self._tg.start_soon(handler, msg, send_reply)
 
         return _handler
 
     async def _message_reader(self, *, task_status):
         unmarshaller = Unmarshaller()
-        with anyio.open_cancel_scope() as sc:
-            task_status.started(sc)
-            while True:
-                # data = await self._sock.receive()
-                await anyio.wait_socket_readable(self._sock)
-                if self._sock is None:
-                    return
-                data, aux, *_ = self._sock.recvmsg(8192, 4096)
-                if not data:
-                    raise anyio.EndOfStream
-                unmarshaller.feed(data, aux)
+        task_status.started()
+        while True:
+            # data = await self._sock.receive()
+            await anyio.wait_socket_readable(self._sock)
+            if self._sock is None:
+                return
+            data, aux, *_ = self._sock.recvmsg(8192, 4096)
+            if not data:
+                raise anyio.EndOfStream
+            unmarshaller.feed(data, aux)
 
-                for msg in unmarshaller:
-                    self._tg.spawn(self._on_message, msg)
-
-    async def _message_writer(self, *, task_status):
-        with anyio.open_cancel_scope() as sc:
-            task_status.started(sc)
-
-            async for msg in self._write_r:
-                buf, unix_fds = msg
-                await self._write_one(buf, unix_fds)
+            for msg in unmarshaller:
+                self._tg.start_soon(self._on_message, msg)
 
     async def _write_one(self, buf, unix_fds):
         async with self._write_lock:

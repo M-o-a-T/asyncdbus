@@ -61,6 +61,10 @@ class ExampleInterface(ServiceInterface):
     def throws_error(self, val: Str):
         raise DBusError('test.error', 'told you so')
 
+    @dbus_property(PropertyAccess.READ, disabled=True)
+    def returns_wrong_type(self) -> 's':
+        return 5
+
     @method()
     async def do_emit_properties_changed(self):
         changed = {'string_prop': 'asdf'}
@@ -68,12 +72,77 @@ class ExampleInterface(ServiceInterface):
         await self.emit_properties_changed(changed, invalidated)
 
 
+class AsyncInterface(ServiceInterface):
+    def __init__(self, name):
+        super().__init__(name)
+        self._string_prop = 'hi'
+        self._readonly_prop = 100
+        self._disabled_prop = '1234'
+        self._container_prop = [['hello', 'world']]
+        self._renamed_prop = '65'
+
+    @dbus_property()
+    async def string_prop(self) -> 's':
+        return self._string_prop
+
+    @string_prop.setter
+    async def string_prop_setter(self, val: 's'):
+        self._string_prop = val
+
+    @dbus_property(PropertyAccess.READ)
+    async def readonly_prop(self) -> 'x':
+        return self._readonly_prop
+
+    @dbus_property()
+    async def container_prop(self) -> 'a(ss)':
+        return self._container_prop
+
+    @container_prop.setter
+    async def container_prop(self, val: 'a(ss)'):
+        self._container_prop = val
+
+    @dbus_property(name='renamed_prop')
+    async def original_name(self) -> 's':
+        return self._renamed_prop
+
+    @original_name.setter
+    async def original_name_setter(self, val: 's'):
+        self._renamed_prop = val
+
+    @dbus_property(disabled=True)
+    async def disabled_prop(self) -> 's':
+        return self._disabled_prop
+
+    @disabled_prop.setter
+    async def disabled_prop(self, val: 's'):
+        self._disabled_prop = val
+
+    @dbus_property(disabled=True)
+    async def throws_error(self) -> 's':
+        raise DBusError('test.error', 'told you so')
+
+    @throws_error.setter
+    async def throws_error(self, val: 's'):
+        raise DBusError('test.error', 'told you so')
+
+    @dbus_property(PropertyAccess.READ, disabled=True)
+    async def returns_wrong_type(self) -> 's':
+        return 5
+
+    @method()
+    async def do_emit_properties_changed(self):
+        changed = {'string_prop': 'asdf'}
+        invalidated = ['container_prop']
+        await self.emit_properties_changed(changed, invalidated)
+
+
+@pytest.mark.parametrize('interface_class', [ExampleInterface, AsyncInterface])
 @pytest.mark.anyio
-async def test_property_methods():
+async def test_property_methods(interface_class):
     async with MessageBus().connect() as bus1, \
             MessageBus().connect() as bus2:
 
-        interface = ExampleInterface('test.interface')
+        interface = interface_class('test.interface')
         export_path = '/test/path'
         await bus1.export(export_path, interface)
 
@@ -106,7 +175,10 @@ async def test_property_methods():
             'Set', 'ssv',
             [interface.name, 'string_prop', Variant(Str, 'ho')])
         assert result.message_type == MessageType.METHOD_RETURN, result.body[0]
-        assert interface.string_prop == 'ho'
+        if interface_class is AsyncInterface:
+            assert 'ho', await interface.string_prop()
+        else:
+            assert 'ho', interface.string_prop
 
         with pytest.raises(DBusError) as err:
             await call_properties('Set', 'ssv',
@@ -141,10 +213,17 @@ async def test_property_methods():
         assert result.message_type == MessageType.ERROR
         assert result.error_name == ErrorType.INVALID_SIGNATURE.value
 
-        # enable the erroring property so we can test it
+        # enable the erroring properties so we can test them
         for prop in ServiceInterface._get_properties(interface):
-            if prop.name == 'throws_error':
+            if prop.name in ['throws_error', 'returns_wrong_type']:
                 prop.disabled = False
+
+        # return signature mismatch
+        with pytest.raises(DBusError) as err:
+            await call_properties('Get', 'ss', [interface.name, 'returns_wrong_type'])
+        result = err.value.reply
+        assert result.message_type == MessageType.ERROR, result.body[0]
+        assert result.error_name == ErrorType.SERVICE_ERROR.value
 
         with pytest.raises(DBusError) as err:
             await call_properties(
@@ -162,6 +241,12 @@ async def test_property_methods():
         assert result.error_name == 'test.error'
         assert result.body == ['told you so']
 
+        # disable the 'returns_wrong_type' prop so it doesn't confuse the
+        # next test (depends on ordering)
+        for prop in ServiceInterface._get_properties(interface):
+            if prop.name in ['returns_wrong_type']:
+                prop.disabled = True
+
         with pytest.raises(DBusError) as err:
             await call_properties('GetAll', Str, [interface.name])
         result = err.value.reply
@@ -169,9 +254,13 @@ async def test_property_methods():
         assert result.error_name == 'test.error'
         assert result.body == ['told you so']
 
+        pass # closing buses
+    pass # end test
 
+
+@pytest.mark.parametrize('interface_class', [ExampleInterface, AsyncInterface])
 @pytest.mark.anyio
-async def test_property_changed_signal():
+async def test_property_changed_signal(interface_class):
     async with MessageBus().connect() as bus1, \
             MessageBus().connect() as bus2:
 
@@ -184,13 +273,17 @@ async def test_property_changed_signal():
                 signature=Str,
                 body=[f'sender={bus1.unique_name}']))
 
-        interface = ExampleInterface('test.interface')
+        interface = interface_class('test.interface')
         export_path = '/test/path'
+
+        # turn off erroring properties
+        for prop in ServiceInterface._get_properties(interface):
+            if prop.name in ['throws_error','returns_wrong_type']:
+                prop.disabled = True
         await bus1.export(export_path, interface)
 
         async def wait_for_message():
-            # TODO timeout
-            evt = anyio.create_event()
+            evt = anyio.Event()
             sig = None
 
             async def message_handler(signal):
@@ -201,7 +294,8 @@ async def test_property_changed_signal():
                     evt.set()
 
             bus2.add_message_handler(message_handler)
-            await evt.wait()
+            with anyio.fail_after(0.1):
+                await evt.wait()
             return sig
 
         await bus2.send(

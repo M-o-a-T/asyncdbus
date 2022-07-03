@@ -1,3 +1,5 @@
-attrs==20.3.0
+# This library has no required dependencies. These dependencies are only for
+# running the test suite and documentation generator.
+
 anyio>=3
 outcome

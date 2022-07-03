@@ -55,7 +55,7 @@ class SecondExampleInterface(ServiceInterface):
 
 class ExpectMessage:
     def __init__(self, bus1, bus2, interface_name, timeout=1):
-        self.evt = anyio.create_event()
+        self.evt = anyio.Event()
         self.result = None
         self.bus1 = bus1
         self.bus2 = bus2
@@ -72,7 +72,7 @@ class ExpectMessage:
             return True
 
     async def timeout_handler(self, *, task_status):
-        with anyio.open_cancel_scope() as self.timeout_task:
+        with anyio.CancelScope() as self.timeout_task:
             task_status.started()
             await anyio.sleep(self.timeout)
             self.result = outcome.Error(TimeoutError())

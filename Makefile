@@ -1,6 +1,8 @@
 .PHONY: lint check format test docker-test clean publish docs livedocs all
 .DEFAULT_GOAL := all
 
+PYPI=asyncdbus
+
 source_dirs = asyncdbus test examples
 
 lint:
@@ -13,7 +15,7 @@ format:
 	python3 -m yapf -rip $(source_dirs)
 
 test:
-	for py in python3.6 python3.7 python3.9 python3.8 ; do \
+	for py in python3.6 python3.7 python3.9 python3.10 python3.8 ; do \
 		if hash $$py; then \
 			dbus-run-session $$py -m pytest -sv --cov=asyncdbus || exit 1 ; \
 		fi \
@@ -28,8 +30,9 @@ clean:
 	rm -rf `find -type d -name __pycache__`
 
 publish:
-	python3 setup.py sdist bdist_wheel
-	python3 -m twine upload --repository-url https://upload.pypi.org/legacy/ dist/*
+	python3 setup.py sdist
+	twine upload dist/${PYPI}-$(shell git describe --tags --exact-match).tar.gz
+	#python3 -m twine upload --repository-url https://upload.pypi.org/legacy/ dist/*
 
 docs:
 	sphinx-build docs docs/_build/html

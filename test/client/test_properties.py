@@ -12,6 +12,7 @@ class ExampleInterface(ServiceInterface):
         self.error_name = 'test.error'
         self.error_text = 'i am bad'
         self._int64_property = -10000
+        self._err = False
 
     @dbus_property()
     def SomeProperty(self) -> Str:
@@ -27,6 +28,8 @@ class ExampleInterface(ServiceInterface):
 
     @dbus_property()
     def ErrorThrowingProperty(self) -> Str:
+        if not self._err:
+            return "I am an error"
         raise DBusError(self.error_name, self.error_text)
 
     @ErrorThrowingProperty.setter
@@ -38,6 +41,9 @@ class ExampleInterface(ServiceInterface):
 async def test_aio_properties():
     async with MessageBus().connect() as service_bus:
         service_interface = ExampleInterface()
+
+        # 'export' collects all properties
+        service_interface._err = False
         await service_bus.export('/test/path', service_interface)
 
         async with MessageBus().connect() as bus:
@@ -54,21 +60,15 @@ async def test_aio_properties():
             await interface.set_some_property('different')
             assert service_interface._some_property == 'different'
 
-            with pytest.raises(DBusError):
-                try:
-                    prop = await interface.get_error_throwing_property()
-                    assert False, prop
-                except DBusError as e:
-                    assert e.type == service_interface.error_name
-                    assert e.text == service_interface.error_text
-                    assert type(e.reply) is Message
-                    raise e
+            service_interface._err = True
+            with pytest.raises(DBusError) as err:
+                await interface.get_error_throwing_property()
+            assert err.value.type == service_interface.error_name
+            assert err.value.text == service_interface.error_text
+            assert type(err.value.reply) is Message
 
-            with pytest.raises(DBusError):
-                try:
-                    await interface.set_error_throwing_property('different')
-                except DBusError as e:
-                    assert e.type == service_interface.error_name
-                    assert e.text == service_interface.error_text
-                    assert type(e.reply) is Message
-                    raise e
+            with pytest.raises(DBusError) as err:
+                await interface.set_error_throwing_property('different')
+            assert err.value.type == service_interface.error_name
+            assert err.value.text == service_interface.error_text
+            assert type(err.value.reply) is Message

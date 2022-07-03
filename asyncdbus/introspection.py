@@ -386,7 +386,7 @@ class Node:
 
     This class is an essential building block for a high-level DBus interface.
     This is the underlying data structure for the :class:`ProxyObject
-    <asyncdbus.proxy_object.BaseProxyInterface>`.  A :class:`ServiceInterface
+    <asyncdbus.proxy_object.ProxyInterface>`.  A :class:`ServiceInterface
     <asyncdbus.service.ServiceInterface>` definition is converted to this class
     to expose XML on the introspectable interface.
 

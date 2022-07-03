@@ -29,7 +29,7 @@ class _AuthResponse(enum.Enum):
 
 # UNSTABLE
 class Authenticator:
-    """The base class for authenticators for :class:`MessageBus <asyncdbus.message_bus.BaseMessageBus>` authentication.
+    """The base class for authenticators for :class:`MessageBus <asyncdbus.message_bus.MessageBus>` authentication.
 
     In the future, the library may allow extending this class for custom authentication protocols.
 
@@ -50,7 +50,7 @@ class Authenticator:
 
 class AuthExternal(Authenticator):
     """An authenticator class for the external auth protocol for use with the
-    :class:`MessageBus <asyncdbus.message_bus.BaseMessageBus>`.
+    :class:`MessageBus <asyncdbus.message_bus.MessageBus>`.
 
     :sealso: https://dbus.freedesktop.org/doc/dbus-specification.html#auth-protocol
     """
@@ -82,7 +82,7 @@ class AuthExternal(Authenticator):
 
 class AuthAnnonymous(Authenticator):
     """An authenticator class for the annonymous auth protocol for use with the
-    :class:`MessageBus <asyncdbus.message_bus.BaseMessageBus>`.
+    :class:`MessageBus <asyncdbus.message_bus.MessageBus>`.
 
     :sealso: https://dbus.freedesktop.org/doc/dbus-specification.html#auth-protocol
     """
