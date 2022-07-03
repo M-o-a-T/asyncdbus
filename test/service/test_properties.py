@@ -130,10 +130,10 @@ class AsyncInterface(ServiceInterface):
         return 5
 
     @method()
-    def do_emit_properties_changed(self):
+    async def do_emit_properties_changed(self):
         changed = {'string_prop': 'asdf'}
         invalidated = ['container_prop']
-        self.emit_properties_changed(changed, invalidated)
+        await self.emit_properties_changed(changed, invalidated)
 
 
 @pytest.mark.parametrize('interface_class', [ExampleInterface, AsyncInterface])
@@ -175,7 +175,6 @@ async def test_property_methods(interface_class):
             'Set', 'ssv',
             [interface.name, 'string_prop', Variant(Str, 'ho')])
         assert result.message_type == MessageType.METHOD_RETURN, result.body[0]
-        assert interface.string_prop == 'ho'
         if interface_class is AsyncInterface:
             assert 'ho', await interface.string_prop()
         else:
@@ -219,7 +218,10 @@ async def test_property_methods(interface_class):
             if prop.name in ['throws_error', 'returns_wrong_type']:
                 prop.disabled = False
 
-        result = await call_properties('Get', 'ss', [interface.name, 'returns_wrong_type'])
+        # return signature mismatch
+        with pytest.raises(DBusError) as err:
+            await call_properties('Get', 'ss', [interface.name, 'returns_wrong_type'])
+        result = err.value.reply
         assert result.message_type == MessageType.ERROR, result.body[0]
         assert result.error_name == ErrorType.SERVICE_ERROR.value
 
@@ -239,12 +241,21 @@ async def test_property_methods(interface_class):
         assert result.error_name == 'test.error'
         assert result.body == ['told you so']
 
+        # disable the 'returns_wrong_type' prop so it doesn't confuse the
+        # next test (depends on ordering)
+        for prop in ServiceInterface._get_properties(interface):
+            if prop.name in ['returns_wrong_type']:
+                prop.disabled = True
+
         with pytest.raises(DBusError) as err:
             await call_properties('GetAll', Str, [interface.name])
         result = err.value.reply
         assert result.message_type == MessageType.ERROR, result.body[0]
         assert result.error_name == 'test.error'
         assert result.body == ['told you so']
+
+        pass # closing buses
+    pass # end test
 
 
 @pytest.mark.parametrize('interface_class', [ExampleInterface, AsyncInterface])
@@ -264,6 +275,11 @@ async def test_property_changed_signal(interface_class):
 
         interface = interface_class('test.interface')
         export_path = '/test/path'
+
+        # turn off erroring properties
+        for prop in ServiceInterface._get_properties(interface):
+            if prop.name in ['throws_error','returns_wrong_type']:
+                prop.disabled = True
         await bus1.export(export_path, interface)
 
         async def wait_for_message():
