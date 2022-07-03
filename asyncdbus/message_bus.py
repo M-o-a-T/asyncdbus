@@ -88,8 +88,6 @@ class MessageBus:
         # anyio support
         self._negotiate_unix_fd = negotiate_unix_fd
 
-        self._reader = None
-        self._writer = None
         self._tg = None
         self._write_lock = anyio.Lock()
 
@@ -208,7 +206,7 @@ class MessageBus:
                     interface='org.freedesktop.DBus.Introspectable',
                     member='Introspect'))
 
-        self._check_method_return(reply, None, 's')
+        self._check_method_return(reply, 's')
         return intr.Node.parse(reply.body[0])
 
     async def _emit_interface_added(self, path, interface):
@@ -229,7 +227,7 @@ class MessageBus:
         result = await ServiceInterface._get_all_property_values(interface)
         body = {interface.name: result}
 
-        self.send_soon(
+        await self.send(
             Message.new_signal(path=path,
                                 interface='org.freedesktop.DBus.ObjectManager',
                                 member='InterfacesAdded',
@@ -287,7 +285,7 @@ class MessageBus:
                 signature='su',
                 body=[name, flags]))
 
-        self._check_method_return(reply, None, 'u')
+        self._check_method_return(reply, 'u')
         return RequestNameReply(reply.body[0])
 
     async def release_name(self, name: str):
@@ -314,7 +312,7 @@ class MessageBus:
                 signature='s',
                 body=[name]))
 
-        self._check_method_return(reply, None, 'u')
+        self._check_method_return(reply, 'u')
         return ReleaseNameReply(reply.body[0])
 
     async def get_proxy_object(self, bus_name: str, path: str,
@@ -400,13 +398,8 @@ class MessageBus:
 
         self._disconnected = True
 
-        if self._reader is not None:
-            self._reader.cancel()
-        if self._writer is not None:
-            self._writer.cancel()
         if self._tg is not None:
             self._tg.cancel_scope.cancel()
-        self._write = None
 
         sock, self._sock = self._sock, None
         sock.close()
@@ -544,12 +537,13 @@ class MessageBus:
         :raises:
             - :class:`Exception` - If a connection error occurred.
         """
-        if msg.message_type is MessageType.METHOD_CALL and not msg.serial:
-            msg.serial = self.next_serial()
 
         if msg.flags & MessageFlag.NO_REPLY_EXPECTED or msg.message_type is not MessageType.METHOD_CALL:
             await self.send(msg)
             return
+
+        if not msg.serial:
+            msg.serial = self.next_serial()
 
         result = None
         evt = anyio.Event()
@@ -568,8 +562,6 @@ class MessageBus:
         await self.send(msg)
         await evt.wait()
         res = result.unwrap()
-        if res:
-            self._name_owners[msg.destination] = res.sender
         self._check_method_return(res)
         return res
 
@@ -587,10 +579,8 @@ class MessageBus:
             raise TypeError(text)
 
     @staticmethod
-    def _check_method_return(msg, err=None, signature=None):
-        if err:
-            raise err
-        elif msg.message_type == MessageType.METHOD_RETURN and (signature is None
+    def _check_method_return(msg, signature=None):
+        if msg.message_type == MessageType.METHOD_RETURN and (signature is None
                                                                 or msg.signature == signature):
             return
         elif msg.message_type == MessageType.ERROR:
@@ -699,11 +689,13 @@ class MessageBus:
 
         else:
             # An ERROR or a METHOD_RETURN
-            if msg.reply_serial in self._method_return_handlers:
+            try:
+                handler = self._method_return_handlers.pop(msg.reply_serial)
+            except KeyError:
+                pass
+            else:
                 if not handled:
-                    handler = self._method_return_handlers[msg.reply_serial]
                     handler(msg, None)
-                del self._method_return_handlers[msg.reply_serial]
 
     @staticmethod
     def _make_method_handler(interface, method):
@@ -1039,28 +1031,16 @@ class MessageBus:
             self._tg = tg
             await self._authenticate()
 
-            self._write, self._write_r = anyio.create_memory_object_stream(10)
-            self._reader = await tg.start(self._message_reader)
-
-            def on_hello(reply, err):
-                if err:
-                    raise err
-                self.unique_name = reply.body[0]
-                evt.set()
+            await tg.start(self._message_reader)
 
             hello_msg = Message(
                 destination='org.freedesktop.DBus',
                 path='/org/freedesktop/DBus',
                 interface='org.freedesktop.DBus',
-                member='Hello',
-                serial=self.next_serial())
+                member='Hello')
 
-            self._method_return_handlers[hello_msg.serial] = on_hello
-            await anyio.wait_socket_writable(self._sock)
-            self._sock.send(hello_msg._marshall())
-
-            await evt.wait()
-            self._writer = await tg.start(self._message_writer)
+            res = await self.call(hello_msg)
+            self.unique_name = res.body[0]
 
             self._disconnected = False
             try:
@@ -1074,7 +1054,7 @@ class MessageBus:
         """Asynchronously send a message on the message bus.
 
         This method is a coroutine which returns when the message is sent
-        successfully. Use `send_soon` if you need a sync version.
+        successfully.
 
         :param msg: The message to send.
         :type msg: :class:`Message <asyncdbus.Message>`
@@ -1086,24 +1066,6 @@ class MessageBus:
 
         await self._write_one(
             msg._marshall(negotiate_unix_fd=self._negotiate_unix_fd), copy(msg.unix_fds))
-
-    def send_soon(self, msg: Message):
-        """Queue a message on the message bus for transmission.
-
-        This method is not a coroutine and should not be used unless
-        absolutely necessary. An async version that waits for transmission
-        to be completed is `send`.
-
-        :param msg: The message to send.
-        :type msg: :class:`Message <asyncdbus.Message>`
-
-        :returns: Nothing.
-        """
-        if not msg.serial:
-            msg.serial = self.next_serial()
-
-        self._write.send_nowait((msg._marshall(negotiate_unix_fd=self._negotiate_unix_fd),
-                                 copy(msg.unix_fds)))
 
     def _make_method_handler(self, interface, method):
         async def handler(msg, send_reply):
@@ -1137,28 +1099,19 @@ class MessageBus:
 
     async def _message_reader(self, *, task_status):
         unmarshaller = Unmarshaller()
-        with anyio.CancelScope() as sc:
-            task_status.started(sc)
-            while True:
-                # data = await self._sock.receive()
-                await anyio.wait_socket_readable(self._sock)
-                if self._sock is None:
-                    return
-                data, aux, *_ = self._sock.recvmsg(8192, 4096)
-                if not data:
-                    raise anyio.EndOfStream
-                unmarshaller.feed(data, aux)
+        task_status.started()
+        while True:
+            # data = await self._sock.receive()
+            await anyio.wait_socket_readable(self._sock)
+            if self._sock is None:
+                return
+            data, aux, *_ = self._sock.recvmsg(8192, 4096)
+            if not data:
+                raise anyio.EndOfStream
+            unmarshaller.feed(data, aux)
 
-                for msg in unmarshaller:
-                    self._tg.start_soon(self._on_message, msg)
-
-    async def _message_writer(self, *, task_status):
-        with anyio.CancelScope() as sc:
-            task_status.started(sc)
-
-            async for msg in self._write_r:
-                buf, unix_fds = msg
-                await self._write_one(buf, unix_fds)
+            for msg in unmarshaller:
+                self._tg.start_soon(self._on_message, msg)
 
     async def _write_one(self, buf, unix_fds):
         async with self._write_lock:
