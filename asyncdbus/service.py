@@ -8,7 +8,6 @@ from functools import wraps
 import inspect
 from typing import no_type_check_decorator, Dict, List, Any
 import copy
-import asyncio
 
 
 class _Method:
@@ -472,84 +471,25 @@ class ServiceInterface:
                                                signal.signature, body, fds)
 
     @staticmethod
-    def _get_property_value(interface, prop, callback):
-        # XXX MUST CHECK TYPE RETURNED BY GETTER
-        try:
-            if asyncio.iscoroutinefunction(prop.prop_getter):
-                task = asyncio.ensure_future(prop.prop_getter(interface))
-
-                def get_property_callback(task):
-                    try:
-                        result = task.result()
-                    except Exception as e:
-                        callback(interface, prop, None, e)
-                        return
-
-                    callback(interface, prop, result, None)
-
-                task.add_done_callback(get_property_callback)
-                return
-
-            callback(interface, prop, getattr(interface, prop.prop_getter.__name__), None)
-        except Exception as e:
-            callback(interface, prop, None, e)
+    async def _get_property_value(interface, prop):
+        res = prop.prop_getter(interface)
+        if inspect.iscoroutine(res):
+            res = await res
+        return res
 
     @staticmethod
-    def _set_property_value(interface, prop, value, callback):
-        # XXX MUST CHECK TYPE TO SET
-        try:
-            if asyncio.iscoroutinefunction(prop.prop_setter):
-                task = asyncio.ensure_future(prop.prop_setter(interface, value))
-
-                def set_property_callback(task):
-                    try:
-                        task.result()
-                    except Exception as e:
-                        callback(interface, prop, e)
-                        return
-
-                    callback(interface, prop, None)
-
-                task.add_done_callback(set_property_callback)
-                return
-
-            setattr(interface, prop.prop_setter.__name__, value)
-            callback(interface, prop, None)
-        except Exception as e:
-            callback(interface, prop, e)
+    async def _set_property_value(interface, prop, value):
+        res = prop.prop_setter(interface, value)
+        if inspect.iscoroutine(res):
+            res = await res
 
     @staticmethod
-    def _get_all_property_values(interface, callback, user_data=None):
+    async def _get_all_property_values(interface):
         result = {}
-        result_error = None
-
         for prop in ServiceInterface._get_properties(interface):
             if prop.disabled or not prop.access.readable():
                 continue
-            result[prop.name] = None
+            value = await ServiceInterface._get_property_value(interface, prop)
+            result[prop.name] = Variant(prop.signature, value)
+        return result
 
-        if not result:
-            callback(interface, result, user_data, None)
-            return
-
-        def get_property_callback(interface, prop, value, e):
-            nonlocal result_error
-            if e is not None:
-                result_error = e
-                del result[prop.name]
-            else:
-                try:
-                    result[prop.name] = Variant(prop.signature, value)
-                except SignatureBodyMismatchError as e:
-                    result_error = e
-                    del result[prop.name]
-
-            if any(v is None for v in result.values()):
-                return
-
-            callback(interface, result, user_data, result_error)
-
-        for prop in ServiceInterface._get_properties(interface):
-            if prop.disabled or not prop.access.readable():
-                continue
-            ServiceInterface._get_property_value(interface, prop, get_property_callback)
