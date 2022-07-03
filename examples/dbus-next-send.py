@@ -54,8 +54,10 @@ body = args.body
 message_type = MessageType[args.type]
 signature = args.signature
 
-bus_type = BusType.SESSION
+bus_type = BusType.DETECT
 
+if args.session:
+    bus_type = BusType.SESSION
 if args.system:
     bus_type = BusType.SYSTEM
 

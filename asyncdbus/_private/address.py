@@ -94,6 +94,11 @@ def get_session_bus_address():
 
 
 def get_bus_address(bus_type):
+    if bus_type == BusType.DETECT:
+        bus_type = BusType.SESSION \
+            if 'DBUS_SESSION_BUS_ADDRESS' in os.environ
+            else BusType.SYSTEM
+
     if bus_type == BusType.SESSION:
         return get_session_bus_address()
     elif bus_type == BusType.SYSTEM:
