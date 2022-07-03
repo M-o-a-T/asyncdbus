@@ -268,7 +268,7 @@ async def test_property_changed_signal(interface_class):
 
         async def wait_for_message():
             # TODO timeout
-            evt = anyio.create_event()
+            evt = anyio.Event()
             sig = None
 
             async def message_handler(signal):

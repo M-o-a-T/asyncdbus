@@ -124,7 +124,7 @@ async def test_sending_signals_between_buses():
 
         async def wait_for_message():
             sig = None
-            evt = anyio.create_event()
+            evt = anyio.Event()
 
             def message_handler(signal):
                 nonlocal sig

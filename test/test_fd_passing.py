@@ -150,7 +150,7 @@ async def test_high_level_service_fd_passing():
         os.close(fd)
 
         # signals
-        evt = anyio.create_event()
+        evt = anyio.Event()
         res = None
 
         def fd_listener(msg):
@@ -255,7 +255,7 @@ async def test_sending_file_descriptor_with_proxy():
         interface.cleanup()
         os.close(fd)
 
-        evt = anyio.create_event()
+        evt = anyio.Event()
         res = None
 
         async def on_signal_fd(fd):

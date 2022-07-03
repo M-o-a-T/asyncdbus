@@ -91,7 +91,7 @@ class MessageBus:
         self._reader = None
         self._writer = None
         self._tg = None
-        self._write_lock = anyio.create_lock()
+        self._write_lock = anyio.Lock()
 
         if auth is None:
             self._auth = AuthExternal()
@@ -563,7 +563,7 @@ class MessageBus:
             return
 
         result = None
-        evt = anyio.create_event()
+        evt = anyio.Event()
 
         def reply_notify(reply, err):
             nonlocal result, evt
@@ -1088,7 +1088,7 @@ class MessageBus:
         if not self._disconnected:
             raise RuntimeError("You can't connect twice")
         await self._setup_socket_aio()
-        evt = anyio.create_event()
+        evt = anyio.Event()
 
         async with anyio.create_task_group() as tg:
             self._tg = tg
