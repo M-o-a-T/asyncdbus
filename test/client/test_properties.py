@@ -60,21 +60,15 @@ async def test_aio_properties():
             await interface.set_some_property('different')
             assert service_interface._some_property == 'different'
 
-            with pytest.raises(DBusError):
-                try:
-                    prop = await interface.get_error_throwing_property()
-                    assert False, prop
-                except DBusError as e:
-                    assert e.type == service_interface.error_name
-                    assert e.text == service_interface.error_text
-                    assert type(e.reply) is Message
-                    raise e
+            service_interface._err = True
+            with pytest.raises(DBusError) as err:
+                await interface.get_error_throwing_property()
+            assert err.value.type == service_interface.error_name
+            assert err.value.text == service_interface.error_text
+            assert type(err.value.reply) is Message
 
-            with pytest.raises(DBusError):
-                try:
-                    await interface.set_error_throwing_property('different')
-                except DBusError as e:
-                    assert e.type == service_interface.error_name
-                    assert e.text == service_interface.error_text
-                    assert type(e.reply) is Message
-                    raise e
+            with pytest.raises(DBusError) as err:
+                await interface.set_error_throwing_property('different')
+            assert err.value.type == service_interface.error_name
+            assert err.value.text == service_interface.error_text
+            assert type(err.value.reply) is Message
