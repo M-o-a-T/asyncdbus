@@ -90,7 +90,7 @@ class AsyncInterface(ServiceInterface):
         self._string_prop = val
 
     @dbus_property(PropertyAccess.READ)
-    async def readonly_prop(self) -> 't':
+    async def readonly_prop(self) -> 'x':
         return self._readonly_prop
 
     @dbus_property()
