@@ -15,8 +15,10 @@ async def test_tcp_connection_with_forwarding():
 
         addr_info = parse_address(os.environ.get('DBUS_SESSION_BUS_ADDRESS'))
         assert addr_info
-        assert 'abstract' in addr_info[0][1]
-        path = f'\0{addr_info[0][1]["abstract"]}'
+        if 'abstract' in addr_info[0][1]:
+            path = f'\0{addr_info[0][1]["abstract"]}'
+        else:
+            path = addr_info[0][1]["path"]
 
         async def handle_connection(tcp_sock):
             async with await anyio.connect_unix(path) as unix_sock:
