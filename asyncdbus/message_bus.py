@@ -316,7 +316,7 @@ class MessageBus:
         return ReleaseNameReply(reply.body[0])
 
     async def get_proxy_object(self, bus_name: str, path: str,
-                               introspection: Union[intr.Node, str, ET.Element]) -> ProxyObject:
+                               introspection: Union[intr.Node, str, ET.Element] = None) -> ProxyObject:
         """Get a proxy object for the path exported on the bus that owns the
         name. The object is expected to export the interfaces and nodes
         specified in the introspection data.
@@ -343,6 +343,9 @@ class MessageBus:
             raise Exception('the message bus implementation did not provide a proxy object class')
 
         await self._init_high_level_client()
+
+        if introspection is None:
+            introspection = await self.introspect(bus_name, path)
 
         return self._ProxyObject(bus_name, path, introspection, self)
 
