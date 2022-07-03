@@ -933,14 +933,14 @@ class MessageBus:
 
         del self._match_rules[match_rule]
 
-        def remove_match_notify(msg, err):
-            if self._disconnected:
-                return
-
-            if err:
-                logging.error(f'remove match request failed. match="{match_rule}", {err}')
-            if msg.message_type == MessageType.ERROR:
-                logging.error(f'remove match request failed. match="{match_rule}", {msg.body[0]}')
+        await self.call(
+            Message(
+                destination='org.freedesktop.DBus',
+                interface='org.freedesktop.DBus',
+                path='/org/freedesktop/DBus',
+                member='RemoveMatch',
+                signature='s',
+                body=[match_rule]))
 
     async def _setup_socket_aio(self):
         err = None
