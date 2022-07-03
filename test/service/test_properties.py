@@ -267,7 +267,6 @@ async def test_property_changed_signal(interface_class):
         await bus1.export(export_path, interface)
 
         async def wait_for_message():
-            # TODO timeout
             evt = anyio.Event()
             sig = None
 
@@ -279,7 +278,8 @@ async def test_property_changed_signal(interface_class):
                     evt.set()
 
             bus2.add_message_handler(message_handler)
-            await evt.wait()
+            with anyio.fail_after(0.1):
+                await evt.wait()
             return sig
 
         await bus2.send(
