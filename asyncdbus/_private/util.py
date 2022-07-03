@@ -115,7 +115,7 @@ def parse_annotation(annotation: str) -> str:
     if not annotation or annotation is inspect.Signature.empty:
         return ''
     if type(annotation) is not str:
-        raise_value_error()
+        return annotation
     try:
         body = ast.parse(annotation).body
         if len(body) == 1 and type(body[0].value) is ast.Constant:
