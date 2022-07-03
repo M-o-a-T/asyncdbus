@@ -12,6 +12,7 @@ class ExampleInterface(ServiceInterface):
         self.error_name = 'test.error'
         self.error_text = 'i am bad'
         self._int64_property = -10000
+        self._err = False
 
     @dbus_property()
     def SomeProperty(self) -> Str:
@@ -27,6 +28,8 @@ class ExampleInterface(ServiceInterface):
 
     @dbus_property()
     def ErrorThrowingProperty(self) -> Str:
+        if not self._err:
+            return "I am an error"
         raise DBusError(self.error_name, self.error_text)
 
     @ErrorThrowingProperty.setter
@@ -38,6 +41,9 @@ class ExampleInterface(ServiceInterface):
 async def test_aio_properties():
     async with MessageBus().connect() as service_bus:
         service_interface = ExampleInterface()
+
+        # 'export' collects all properties
+        service_interface._err = False
         await service_bus.export('/test/path', service_interface)
 
         async with MessageBus().connect() as bus:
