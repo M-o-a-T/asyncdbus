@@ -55,7 +55,7 @@ class MessageBus:
 
     def __init__(self,
                  bus_address: Optional[str] = None,
-                 bus_type: BusType = BusType.SESSION,
+                 bus_type: BusType = BusType.DETECT,
                  auth: Authenticator = None,
                  negotiate_unix_fd: bool = False):
         self.unique_name = None
