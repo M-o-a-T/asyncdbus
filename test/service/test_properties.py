@@ -138,11 +138,11 @@ class AsyncInterface(ServiceInterface):
 
 @pytest.mark.parametrize('interface_class', [ExampleInterface, AsyncInterface])
 @pytest.mark.anyio
-async def test_property_methods():
+async def test_property_methods(interface_class):
     async with MessageBus().connect() as bus1, \
             MessageBus().connect() as bus2:
 
-        interface = ExampleInterface('test.interface')
+        interface = interface_class('test.interface')
         export_path = '/test/path'
         await bus1.export(export_path, interface)
 
@@ -249,7 +249,7 @@ async def test_property_methods():
 
 @pytest.mark.parametrize('interface_class', [ExampleInterface, AsyncInterface])
 @pytest.mark.anyio
-async def test_property_changed_signal():
+async def test_property_changed_signal(interface_class):
     async with MessageBus().connect() as bus1, \
             MessageBus().connect() as bus2:
 
@@ -262,7 +262,7 @@ async def test_property_changed_signal():
                 signature=Str,
                 body=[f'sender={bus1.unique_name}']))
 
-        interface = ExampleInterface('test.interface')
+        interface = interface_class('test.interface')
         export_path = '/test/path'
         await bus1.export(export_path, interface)
 
