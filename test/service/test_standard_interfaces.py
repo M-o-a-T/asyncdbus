@@ -110,7 +110,7 @@ async def test_object_manager():
             '/test/path/deeper': {
                 'test.interface2': {
                     'Bar': Variant(Str, 'str'),
-                    'Foo': Variant(Byte, 42)
+                    'Foo': Variant(Byte, 42),
                     'AsyncProp': Variant('s', 'async'),
                 }
             }
@@ -121,7 +121,7 @@ async def test_object_manager():
                 'test.interface1': {},
                 'test.interface2': {
                     'Bar': Variant(Str, 'str'),
-                    'Foo': Variant(Byte, 42)
+                    'Foo': Variant(Byte, 42),
                     'AsyncProp': Variant('s', 'async'),
                 }
             }
