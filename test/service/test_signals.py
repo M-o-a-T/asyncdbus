@@ -72,7 +72,7 @@ class ExpectMessage:
             return True
 
     async def timeout_handler(self, *, task_status):
-        with anyio.open_cancel_scope() as self.timeout_task:
+        with anyio.CancelScope() as self.timeout_task:
             task_status.started()
             await anyio.sleep(self.timeout)
             self.result = outcome.Error(TimeoutError())

@@ -38,11 +38,11 @@ async def test_tcp_connection_with_forwarding():
                         except (anyio.ClosedResourceError, anyio.EndOfStream):
                             return
 
-                    tg.spawn(handle_read)
-                    tg.spawn(handle_write)
+                    tg.start_soon(handle_read)
+                    tg.start_soon(handle_write)
 
         listener = await anyio.create_tcp_listener(local_port=port, local_host=host)
-        tg.spawn(listener.serve, handle_connection)
+        tg.start_soon(listener.serve, handle_connection)
         await anyio.sleep(0.1)
 
         try:
