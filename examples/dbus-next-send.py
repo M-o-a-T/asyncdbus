@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 import sys
 import os
+import anyio
 
 sys.path.append(os.path.abspath(os.path.dirname(__file__) + '/..'))
 
 from asyncdbus.validators import (is_bus_name_valid, is_member_name_valid, is_object_path_valid,
                                   is_interface_name_valid)
-from asyncdbus import MessageBus
+from asyncdbus import MessageBus, DBusError
 from asyncdbus import MessageType, BusType, Message, Variant
 from argparse import ArgumentParser, OPTIONAL
 import json
