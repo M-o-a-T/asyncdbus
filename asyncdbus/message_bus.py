@@ -687,7 +687,7 @@ class MessageBus:
                         await send_reply(
                             Message.new_error(
                                 msg, ErrorType.UNKNOWN_METHOD,
-                                f'{msg.interface}.{msg.member} with signature "{msg.signature}" could not be found'
+                                f'{msg.interface or "?"}.{msg.member} {msg.path !r} with signature "{msg.signature}" could not be found'
                             ))
 
         else:
