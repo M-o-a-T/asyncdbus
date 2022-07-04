@@ -211,7 +211,10 @@ class Message:
 
     def _matches(self, **kwargs):
         for attr, val in kwargs.items():
-            if getattr(self, attr) != val:
+            rval = getattr(self, attr)
+            if val is None or rval is None:
+                continue
+            if rval != val:
                 return False
 
         return True
