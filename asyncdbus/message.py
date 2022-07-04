@@ -209,10 +209,10 @@ class Message:
             body=body,
             unix_fds=unix_fds)
 
-    def _matches(self, **kwargs):
+    def _matches(self, may_ignore_interface=False, **kwargs):
         for attr, val in kwargs.items():
             rval = getattr(self, attr)
-            if val is None or rval is None:
+            if may_ignore_interface and attr == "interface" and rval is None:
                 continue
             if rval != val:
                 return False

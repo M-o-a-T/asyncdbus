@@ -736,6 +736,7 @@ class MessageBus:
                     if method.disabled:
                         continue
                     if msg._matches(
+                            may_ignore_interface=True,
                             interface=interface.name, member=method.name,
                             signature=method.in_signature):
                         return self._make_method_handler(interface, method)
