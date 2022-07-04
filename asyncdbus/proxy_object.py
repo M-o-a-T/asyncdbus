@@ -334,9 +334,11 @@ class ProxyObject:
         if name in self._interfaces:
             return self._interfaces[name]
 
-        try:
-            intr_interface = next(i for i in self.introspection.interfaces if i.name == name)
-        except StopIteration:
+        for i in self.introspection.interfaces:
+            if i.name == name:
+                intr_interface = i
+                break
+        else:
             raise InterfaceNotFoundError(f'interface not found on this object: {name}')
 
         interface = self.ProxyInterface(self.bus_name, self.path, intr_interface, self.bus)
