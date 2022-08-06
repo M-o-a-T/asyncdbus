@@ -234,6 +234,7 @@ class SignatureType:
                 f'DBus STRUCT type "(" must be Python type "list", got {type(body)}')
 
         if len(body) != len(self.children):
+            breakpoint()
             raise SignatureBodyMismatchError(
                 'DBus STRUCT type "(" must have Python list members equal to the number of struct type members'
             )
@@ -352,7 +353,7 @@ class SignatureTree:
         :raises:
             :class:`SignatureBodyMismatchError` if the signature does not match the body.
         """
-        if not isinstance(body, list):
+        if not isinstance(body, (list,tuple)):
             raise SignatureBodyMismatchError(f'The body must be a list (got {type(body)})')
         if len(body) != len(self.types):
             raise SignatureBodyMismatchError(
