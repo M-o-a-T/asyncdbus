@@ -2,11 +2,13 @@ from ._private.marshaller import Marshaller
 from .constants import MessageType, MessageFlag, ErrorType
 from ._private.constants import PROTOCOL_VERSION, HeaderField, LITTLE_ENDIAN
 from .validators import assert_bus_name_valid, assert_member_name_valid, assert_object_path_valid, assert_interface_name_valid
-from .errors import InvalidMessageError
+from .errors import InvalidMessageError, SignatureBodyMismatchError
 from .signature import SignatureTree, Variant
 
 from typing import List, Any
 
+import logging
+logger = logging.getLogger(__name__)
 
 class Message:
     """A class for sending and receiving messages through the
@@ -207,16 +209,23 @@ class Message:
             body=body,
             unix_fds=unix_fds)
 
-    def _matches(self, **kwargs):
+    def _matches(self, may_ignore_interface=False, **kwargs):
         for attr, val in kwargs.items():
-            if getattr(self, attr) != val:
+            rval = getattr(self, attr)
+            if may_ignore_interface and attr == "interface" and rval is None:
+                continue
+            if rval != val:
                 return False
 
         return True
 
     def _marshall(self, negotiate_unix_fd=False):
         # TODO maximum message size is 134217728 (128 MiB)
-        body_block = Marshaller(self.signature, self.body)
+        try:
+            body_block = Marshaller(self.signature, self.body)
+        except SignatureBodyMismatchError:
+            logger.error("Cannot marshal %r to %s", self.body, self.signature)
+            raise
         body_block.marshall()
 
         fields = []

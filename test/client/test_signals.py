@@ -25,9 +25,7 @@ async def test_signals():
     async with MessageBus().connect() as bus1, \
             MessageBus().connect() as bus2:
 
-        bus_intr = await bus1.introspect('org.freedesktop.DBus', '/org/freedesktop/DBus')
-        bus_obj = await bus1.get_proxy_object('org.freedesktop.DBus', '/org/freedesktop/DBus',
-                                              bus_intr)
+        bus_obj = await bus1.get_proxy_object('org.freedesktop.DBus', '/org/freedesktop/DBus')
         stats = await bus_obj.get_interface('org.freedesktop.DBus.Debug.Stats')
 
         await bus1.request_name('test.signals.name')

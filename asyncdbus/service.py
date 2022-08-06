@@ -452,7 +452,7 @@ class ServiceInterface:
             if out_len == 1:
                 result = [result]
             else:
-                if type(result) is not list:
+                if not isinstance(result,(list,tuple)):
                     raise SignatureBodyMismatchError(
                         'Expected signal to return a list of arguments')
 

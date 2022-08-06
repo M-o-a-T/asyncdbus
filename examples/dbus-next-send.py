@@ -39,15 +39,13 @@ def exit_error(message):
     sys.exit(1)
 
 
-interface_member = vars(args)['interface.member'].split('.')
-
-if len(interface_member) < 2:
+try:
+    interface,member = getattr(args,"interface.member").rsplit('.',1)
+except ValueError:
     exit_error(
-        f'Expecting an interface and member separated by a dot: {vars(args)["interface.member"]}')
+        f'Expecting an interface and member separated by a dot: {args.interface.member}')
 
 destination = args.dest
-member = interface_member[-1]
-interface = '.'.join(interface_member[:len(interface_member) - 1])
 object_path = args.object_path
 signature = args.signature
 body = args.body
