@@ -57,6 +57,21 @@ class Message:
         - :class:`InvalidInterfaceNameError` - If ``error_name`` or ``interface`` is not a valid interface name.
     """
 
+    def __repr__(self):
+        res = {}
+        if self.path is not None:
+            res['path'] = self.path
+        if self.member is not None:
+            res['member'] = self.member
+        if self.sender is not None:
+            res['src'] = self.sender
+        if self.destination is not None:
+            res['dest'] = self.destination
+        res['t'] = str(self.message_type)
+        if self.error_name is not None:
+            res['err'] = self.error_name
+        return f"<Message {' '.join('%s=%s' % (k,v) for k,v in res.items())}>"
+
     def __init__(self,
                  destination: str = None,
                  path: str = None,
