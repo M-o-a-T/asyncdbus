@@ -26,6 +26,10 @@ class InterfaceNotFoundError(Exception):
     pass
 
 
+class NameNotFoundError(Exception):
+    pass
+
+
 class SignalDisabledError(Exception):
     pass
 
