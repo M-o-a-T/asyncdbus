@@ -34,7 +34,7 @@ async def main():
             for changed, variant in changed_properties.items():
                 print(f'property changed: {changed} - {variant.value}')
 
-        properties.on_properties_changed(on_properties_changed)
+        await properties.on_properties_changed(on_properties_changed)
 
         await anyio.sleep(99999)
 
