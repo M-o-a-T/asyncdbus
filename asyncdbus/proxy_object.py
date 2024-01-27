@@ -3,7 +3,7 @@ from . import message_bus
 from .message import Message
 from .constants import MessageType, ErrorType, MessageFlag
 from . import introspection as intr
-from .errors import DBusError, InterfaceNotFoundError
+from .errors import DBusError, InterfaceNotFoundError, NameNotFoundError
 from ._private.util import replace_idx_with_fds, replace_fds_with_idx
 from .signature import Variant, Str, Var, Tuple
 

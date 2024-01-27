@@ -18,6 +18,9 @@ class MessageType(Enum):
     SIGNAL = 4  #: A broadcast signal to subscribed connections
 
 
+MESSAGE_TYPE_MAP = {field.value: field for field in MessageType}
+
+
 class MessageFlag(IntFlag):
     """Flags that affect the behavior of sent and received messages
     """
@@ -25,6 +28,10 @@ class MessageFlag(IntFlag):
     NO_REPLY_EXPECTED = 1  #: The method call does not expect a method return.
     NO_AUTOSTART = 2
     ALLOW_INTERACTIVE_AUTHORIZATION = 4
+
+
+MESSAGE_FLAG_MAP = {field.value: field for field in MessageFlag}
+MESSAGE_FLAG_MAP[0] = "NONE"
 
 
 class NameFlag(IntFlag):

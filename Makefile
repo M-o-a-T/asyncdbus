@@ -15,9 +15,9 @@ format:
 	python3 -m yapf -rip $(source_dirs)
 
 test:
-	for py in python3.6 python3.7 python3.9 python3.10 python3.8 ; do \
-		if hash $$py; then \
-			dbus-run-session $$py -m pytest -sv --cov=asyncdbus || exit 1 ; \
+	for py in python3.9 python3.10 python3.11 python3.8 ; do \
+		if hash $${py}; then \
+			PYTHONPATH=/usr/lib/$${py}/site-packages dbus-run-session $${py} -m pytest -sv --cov=asyncdbus || exit 1 ; \
 		fi \
 	done \
 
