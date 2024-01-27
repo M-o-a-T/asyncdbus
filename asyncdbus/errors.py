@@ -26,6 +26,10 @@ class InterfaceNotFoundError(Exception):
     pass
 
 
+class NameNotFoundError(Exception):
+    pass
+
+
 class SignalDisabledError(Exception):
     pass
 
@@ -73,7 +77,7 @@ class DBusError(Exception):
     @staticmethod
     def _from_message(msg):
         assert msg.message_type == MessageType.ERROR
-        return DBusError(msg.error_name, msg.body[0], reply=msg)
+        return DBusError(msg.error_name, msg.body[0] if msg.body else None, reply=msg)
 
     def _as_message(self, msg):
         return Message.new_error(msg, self.type, self.text)

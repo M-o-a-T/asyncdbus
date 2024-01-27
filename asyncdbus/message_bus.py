@@ -5,7 +5,7 @@ from .message import Message
 from .constants import BusType, MessageFlag, MessageType, ErrorType, NameFlag, RequestNameReply, ReleaseNameReply
 from .service import ServiceInterface
 from .validators import assert_object_path_valid, assert_bus_name_valid
-from .errors import DBusError, InvalidAddressError
+from .errors import DBusError, InvalidAddressError, NameNotFoundError
 from .signature import Variant
 from .proxy_object import ProxyObject
 from . import introspection as intr
@@ -179,6 +179,36 @@ class MessageBus:
                         ServiceInterface._remove_bus(iface, self)
                     break
         await self._emit_interface_removed(path, removed_interfaces)
+
+    async def get_name_owner(self, bus_name: str) -> str:
+        """
+        Get the connection name associated with a given bus name.
+        """
+        res = self._name_owners.get(bus_name, None)
+        if res is not None:
+            return res
+        try:
+            reply = await self.call(
+                Message(
+                    destination='org.freedesktop.DBus',
+                    interface='org.freedesktop.DBus',  
+                    path='/org/freedesktop/DBus',      
+                    member='GetNameOwner',             
+                    signature='s',                     
+                    body=[bus_name]))           
+        except DBusError as err:
+            if err.type != 'org.freedesktop.DBus.Error.NameHasNoOwner':
+                raise
+            raise NameNotFoundError(bus_name)
+        else:
+            res = reply.body[0]
+            self._name_owners[bus_name] = res
+            return res
+
+    async def watch_name_owner(self, bus_name, callback):
+        """
+
+        """
 
     async def introspect(self, bus_name: str, path: str, timeout: float = 30) -> intr.Node:
         """Get introspection data for the node at the given path from the given

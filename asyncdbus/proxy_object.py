@@ -3,7 +3,7 @@ from . import message_bus
 from .message import Message
 from .constants import MessageType, ErrorType, MessageFlag
 from . import introspection as intr
-from .errors import DBusError, InterfaceNotFoundError
+from .errors import DBusError, InterfaceNotFoundError, NameNotFoundError
 from ._private.util import replace_idx_with_fds, replace_fds_with_idx
 from .signature import Variant, Str, Var, Tuple
 
@@ -350,21 +350,11 @@ class ProxyObject:
         for intr_signal in intr_interface.signals:
             interface._add_signal(intr_signal, interface)
 
-        if self.bus_name[0] != ':' and not self.bus._name_owners.get(self.bus_name, ''):
+        if self.bus_name[0] != ':':
             try:
-                reply = await self.bus.call(
-                    Message(
-                        destination='org.freedesktop.DBus',
-                        interface='org.freedesktop.DBus',
-                        path='/org/freedesktop/DBus',
-                        member='GetNameOwner',
-                        signature='s',
-                        body=[self.bus_name]))
-            except DBusError as err:
-                if err.type != 'org.freedesktop.DBus.Error.NameHasNoOwner':
-                    raise
-            else:
-                self.bus._name_owners[self.bus_name] = reply.body[0]
+                await self.bus.get_name_owner(self.bus_name)
+            except NameNotFoundError:
+                pass
 
         self._interfaces[name] = interface
         return interface

@@ -87,7 +87,7 @@ If any file descriptors are sent or received (DBus type `UnixFD` or ``h``), the 
             # emit the changed signal after two seconds.
             await anyio.sleep(2)
 
-            interface.changed()
+            interface.Changed()
 
             await anyio.sleep(99999)
 

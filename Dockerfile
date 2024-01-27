@@ -16,8 +16,8 @@ RUN export DEBIAN_FRONTEND=noninteractive; \
     build-essential \
     python3-pip \
     python3 \
-    python3.6 \
     python3.7 \
+    python3.7-distutils \
     python3.9 \
     python3.9-distutils \
     python3.10 \
@@ -26,13 +26,15 @@ RUN export DEBIAN_FRONTEND=noninteractive; \
     dbus \
     python3-gi
 
-RUN pip3 install yapf flake8 && \
-    for py in python3 python3.6 python3.7 python3.9 python3.10; do \
-        curl https://bootstrap.pypa.io/get-pip.py | $py; \
-        $py -m pip install \
-            pytest \
-            pytest-timeout \
-            pytest-cov; \
+RUN set -e -x; \
+    pip3 install 'yapf' 'flake8'; \
+    curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py; \
+    for py in python3.8 python3.9 python3.10 python3.11 ; do \
+        ${py} get-pip.py; \
+        PYTHONPATH=/usr/lib/${py}/site-packages ${py} -m pip install \
+            'pytest' \
+            'pytest-timeout' \
+            'pytest-cov'; \
     done
 
 ADD . /app

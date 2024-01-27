@@ -21,7 +21,7 @@ async def test_bus_disconnect_before_reply():
 async def test_unexpected_disconnect():
     bus = MessageBus()
     assert not bus.connected
-    with pytest.raises((anyio.BrokenResourceError, OSError, anyio.ExceptionGroup)):
+    with pytest.raises((anyio.BrokenResourceError, OSError, ExceptionGroup)):
         async with bus.connect():
             assert bus.connected
 
