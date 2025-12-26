@@ -30,6 +30,8 @@ class _Method:
             sig = param.annotation
             if hasattr(sig, 'tree'):
                 sig = sig.tree.signature
+            if sig and sig[0] in "'\"":
+                sig = sig[1:-1]
             in_signature += sig
 
         out_args = []
