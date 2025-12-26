@@ -41,3 +41,19 @@ livedocs:
 	sphinx-autobuild docs docs/_build/html --watch asyncdbus
 
 all: format lint test
+
+pypi:   tagged
+	if test -f dist/${PYPI}-$(shell git describe --tags --exact-match).tar.gz ; then \
+		echo "Source package exists."; \
+	elif test -f setup.py ; then \
+		python3 setup.py sdist bdist_wheel ; \
+	else \
+		python3 -mbuild -snw ; \
+	fi
+	twine upload \
+		dist/${PYPI}-$(shell git describe --tags --exact-match).tar.gz \
+		dist/$(subst -,_,${PYPI})-$(shell git describe --tags --exact-match)-py3-none-any.whl
+
+tagged:
+	git describe --tags --exact-match
+	test $$(git ls-files -m | wc -l) = 0

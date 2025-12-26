@@ -1,3 +1,9 @@
+asyncdbus (0.7.1-1) smurf; urgency=medium
+
+  * Merge
+
+ -- Matthias Urlichs <matthias@urlichs.de>  Sat, 27 Dec 2025 00:11:05 +0100
+
 asyncdbus (0.7.0-1) smurf; urgency=medium
 
   * Merge

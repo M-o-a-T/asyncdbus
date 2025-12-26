@@ -57,8 +57,10 @@ class SignatureType:
 
     @staticmethod
     def _parse_next(signature):
-        if not signature:
+        if not signature or signature in ('""',"''"):
             return (None, '')
+        if signature[0] in "'\"":
+            signature = signature[1:-1]
 
         token = signature[0]
 
