@@ -30,6 +30,8 @@ class _Method:
             sig = param.annotation
             if hasattr(sig, 'tree'):
                 sig = sig.tree.signature
+            if sig.startswith("DbusType[") and sig[-1]=="]":
+                sig= sig[9:-1]
             if sig and sig[0] in "'\"":
                 sig = sig[1:-1]
             in_signature += sig

@@ -5,6 +5,13 @@ from typing import Any, List as _List, Union, Tuple as _Tuple, Dict as _Dict, Ge
 from functools import lru_cache
 
 
+class DbusType:
+    """
+    A wrapper so our signatures work with the rest of Python's typing
+    infrastructure.
+    """
+    pass
+
 class SignatureType:
     """A class that represents a single complete type within a signature.
 
@@ -59,6 +66,8 @@ class SignatureType:
     def _parse_next(signature):
         if not signature or signature in ('""',"''"):
             return (None, '')
+        if signature.startswith("DbusType[") and signature[-1]=="]":
+            signature = signature[9:-1]
         if signature[0] in "'\"":
             signature = signature[1:-1]
 
