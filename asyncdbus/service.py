@@ -6,7 +6,7 @@ from ._private.util import signature_contains_type, replace_fds_with_idx, replac
 
 from functools import wraps
 import inspect
-from typing import no_type_check_decorator, Dict, List, Any
+from typing import Dict, List, Any
 import copy
 
 
@@ -90,7 +90,6 @@ def method(name: str = None, disabled: bool = False):
     if type(disabled) is not bool:
         raise TypeError('disabled must be a bool')
 
-    @no_type_check_decorator
     def decorator(fn):
         @wraps(fn)
         def wrapped(*args, **kwargs):
@@ -165,7 +164,6 @@ def signal(name: str = None, disabled: bool = False):
     if type(disabled) is not bool:
         raise TypeError('disabled must be a bool')
 
-    @no_type_check_decorator
     def decorator(fn):
         fn_name = name if name else fn.__name__
         signal = _Signal(fn, fn_name, disabled)
@@ -298,7 +296,6 @@ def dbus_property(access: PropertyAccess = PropertyAccess.READWRITE,
     if type(disabled) is not bool:
         raise TypeError('disabled must be a bool')
 
-    @no_type_check_decorator
     def decorator(fn):
         options = {'name': name, 'access': access, 'disabled': disabled}
         return _Property(fn, options=options)
