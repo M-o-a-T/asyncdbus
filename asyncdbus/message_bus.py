@@ -994,7 +994,7 @@ class MessageBus:
                     sock.setblocking(False)
                     sock.connect(filename)
                 except (BlockingIOError, InterruptedError):
-                    await anyio.wait_socket_writable(sock)
+                    await anyio.wait_writable(sock)
                     e = sock.getsockopt(socket.SOL_SOCKET, socket.SO_ERROR)
                     if e:
                         if err is None:
@@ -1020,7 +1020,7 @@ class MessageBus:
                     sock = socket.create_connection((ip_addr, ip_port))
                     sock.setblocking(False)
                 except (BlockingIOError, InterruptedError):
-                    await anyio.wait_socket_writable(sock)
+                    await anyio.wait_writable(sock)
                     e = sock.getsockopt(socket.SOL_SOCKET, socket.SO_ERROR)
                     if e:
                         if err is None:
@@ -1136,7 +1136,7 @@ class MessageBus:
         task_status.started()
         while True:
             # data = await self._sock.receive()
-            await anyio.wait_socket_readable(self._sock)
+            await anyio.wait_readable(self._sock)
             if self._sock is None:
                 return
             data, aux, *_ = self._sock.recvmsg(8192, 4096)
@@ -1154,7 +1154,7 @@ class MessageBus:
             buf = memoryview(buf)
             done = 0
             while done < len(buf) or (unix_fds and self._negotiate_unix_fd):
-                await anyio.wait_socket_writable(self._sock)
+                await anyio.wait_writable(self._sock)
                 if self._sock is None:
                     raise EOFError
                 if unix_fds and self._negotiate_unix_fd:
@@ -1171,7 +1171,7 @@ class MessageBus:
     async def _auth_readline(self):
         buf = b''
         while buf[-2:] != b'\r\n':
-            await anyio.wait_socket_readable(self._sock)
+            await anyio.wait_readable(self._sock)
             data = self._sock.recv(1024)
             if not data:
                 raise EOFError
@@ -1179,7 +1179,7 @@ class MessageBus:
         return buf[:-2].decode()
 
     async def _authenticate(self):
-        await anyio.wait_socket_writable(self._sock)
+        await anyio.wait_writable(self._sock)
         done = self._sock.send(b'\0')
         if not done:
             raise EOFError
@@ -1189,13 +1189,13 @@ class MessageBus:
         if first_line is not None:
             if not isinstance(first_line, str):
                 raise AuthError('authenticator response is %r not str' % (first_line))
-            await anyio.wait_socket_writable(self._sock)
+            await anyio.wait_writable(self._sock)
             done = self._sock.send(Authenticator._format_line(first_line))
 
         while True:
             response = self._auth._receive_line(await self._auth_readline())
             if response is not None:
-                await anyio.wait_socket_writable(self._sock)
+                await anyio.wait_writable(self._sock)
                 done = self._sock.send(Authenticator._format_line(response))
             if response == 'BEGIN':
                 break
