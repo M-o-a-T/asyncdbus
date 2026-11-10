@@ -1,0 +1,47 @@
+[build-system]
+requires = ["setuptools>=77", "setuptools-scm>=8"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "asyncdbus"
+description = "A zero-dependency async DBus library"
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Matthias Urlichs", email = "matthias@urlichs.de" }]
+requires-python = ">=3.7.0"
+dependencies = ["anyio>=3"]
+dynamic = ["version"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: X11 Applications",
+    "Environment :: X11 Applications :: Gnome",
+    "Topic :: Desktop Environment :: Gnome",
+    "Topic :: Software Development :: Embedded Systems",
+    "Framework :: AsyncIO",
+    "Framework :: Trio",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.7",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: Implementation :: CPython",
+    "Programming Language :: Python :: Implementation :: PyPy",
+    "Typing :: Typed",
+]
+
+[project.urls]
+Homepage = "https://github.com/M-o-a-T/asyncdbus"
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+include = ["asyncdbus*"]
+
+[tool.setuptools.package-data]
+asyncdbus = ["py.typed"]
+
+[tool.setuptools_scm]
+version_scheme = "guess-next-dev"
+local_scheme = "dirty-tag"

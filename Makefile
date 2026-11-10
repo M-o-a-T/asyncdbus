@@ -30,7 +30,7 @@ clean:
 	rm -rf `find -type d -name __pycache__`
 
 publish:
-	python3 setup.py sdist
+	python3 -m build --sdist
 	twine upload dist/${PYPI}-$(shell git describe --tags --exact-match).tar.gz
 	#python3 -m twine upload --repository-url https://upload.pypi.org/legacy/ dist/*
 
@@ -45,8 +45,6 @@ all: format lint test
 pypi:   tagged
 	if test -f dist/${PYPI}-$(shell git describe --tags --exact-match).tar.gz ; then \
 		echo "Source package exists."; \
-	elif test -f setup.py ; then \
-		python3 setup.py sdist bdist_wheel ; \
 	else \
 		python3 -mbuild -snw ; \
 	fi
